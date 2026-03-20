@@ -1,8 +1,9 @@
 import pygame
 
 # pygame setup
+WIDTH, HEIGHT = 800,800
 pygame.init()
-screen = pygame.display.set_mode((1280, 720))
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 running = True
 
@@ -17,7 +18,8 @@ while running:
     screen.fill("purple")
 
     # RENDER YOUR GAME HERE
-
+    rect = (0,0,100,100)
+    pygame.draw.rect(screen, "black", rect)
     # flip() the display to put your work on screen
     pygame.display.flip()
 
