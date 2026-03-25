@@ -17,9 +17,22 @@ clock = pygame.time.Clock()
 
 selected_square = None
 selected_piece = None
+valid_moves = []
 
-# Store pieces as {(row, col): True}
 pieces = {(0, 0): True, (1, 1): True}
+
+def get_valid_moves(pos):
+    row, col = pos
+    moves = []
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    for dr, dc in directions:
+        r, c = row + dr, col + dc
+        if 0 <= r < ROWS and 0 <= c < COLS:
+            if (r, c) not in pieces:
+                moves.append((r, c))
+
+    return moves
 
 running = True
 
@@ -37,16 +50,16 @@ while running:
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked_square = (row, col)
 
-                # If clicking a piece → select it
                 if clicked_square in pieces:
                     selected_piece = clicked_square
                     selected_square = clicked_square
+                    valid_moves = get_valid_moves(clicked_square)
                 else:
-                    # Move piece if one is selected
-                    if selected_piece:
+                    if selected_piece and clicked_square in valid_moves:
                         pieces.pop(selected_piece)
                         pieces[clicked_square] = True
                         selected_piece = None
+                        valid_moves = []
                     selected_square = clicked_square
 
     screen.fill(BACKGROUND)
@@ -59,11 +72,12 @@ while running:
 
             pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
 
-            # Highlight selected square
             if selected_square == (row, col):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
 
-            # Draw piece if exists
+            if (row, col) in valid_moves:
+                pygame.draw.rect(screen, (0, 0, 255), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
+
             if (row, col) in pieces:
                 center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
                 pygame.draw.circle(screen, PIECE_COLOR, center, SQUARE_SIZE // 3)
