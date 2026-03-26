@@ -9,17 +9,24 @@ GREEN = (0, 128, 0)
 BLACK = (0, 0, 0)
 BACKGROUND = (128, 0, 128)
 HIGHLIGHT = (255, 255, 0)
-PIECE_COLOR = (200, 0, 0)
+RED = (200, 0, 0)
+BLUE = (0, 0, 200)
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
-selected_square = None
 selected_piece = None
 valid_moves = []
+current_turn = "RED"
 
-pieces = {(0, 0): True, (1, 1): True}
+# Store pieces with owner
+pieces = {
+    (0, 0): "RED",
+    (1, 1): "RED",
+    (6, 6): "BLUE",
+    (7, 7): "BLUE"
+}
 
 def get_valid_moves(pos):
     row, col = pos
@@ -29,7 +36,8 @@ def get_valid_moves(pos):
     for dr, dc in directions:
         r, c = row + dr, col + dc
         if 0 <= r < ROWS and 0 <= c < COLS:
-            if (r, c) not in pieces:
+            # allow move if empty OR enemy piece (capture)
+            if (r, c) not in pieces or pieces[(r, c)] != current_turn:
                 moves.append((r, c))
 
     return moves
@@ -48,19 +56,28 @@ while running:
             row = (my - MARGIN) // SQUARE_SIZE
 
             if 0 <= row < ROWS and 0 <= col < COLS:
-                clicked_square = (row, col)
+                clicked = (row, col)
 
-                if clicked_square in pieces:
-                    selected_piece = clicked_square
-                    selected_square = clicked_square
-                    valid_moves = get_valid_moves(clicked_square)
+                # Select your own piece
+                if clicked in pieces and pieces[clicked] == current_turn:
+                    selected_piece = clicked
+                    valid_moves = get_valid_moves(clicked)
+
                 else:
-                    if selected_piece and clicked_square in valid_moves:
+                    if selected_piece and clicked in valid_moves:
+                        # Capture if enemy exists
+                        if clicked in pieces:
+                            pieces.pop(clicked)
+
+                        # Move piece
+                        pieces[clicked] = current_turn
                         pieces.pop(selected_piece)
-                        pieces[clicked_square] = True
+
+                        # Switch turn
+                        current_turn = "BLUE" if current_turn == "RED" else "RED"
+
                         selected_piece = None
                         valid_moves = []
-                    selected_square = clicked_square
 
     screen.fill(BACKGROUND)
 
@@ -72,7 +89,7 @@ while running:
 
             pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
 
-            if selected_square == (row, col):
+            if selected_piece == (row, col):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
 
             if (row, col) in valid_moves:
@@ -80,7 +97,8 @@ while running:
 
             if (row, col) in pieces:
                 center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
-                pygame.draw.circle(screen, PIECE_COLOR, center, SQUARE_SIZE // 3)
+                color = RED if pieces[(row, col)] == "RED" else BLUE
+                pygame.draw.circle(screen, color, center, SQUARE_SIZE // 3)
 
     pygame.display.flip()
     clock.tick(60)
