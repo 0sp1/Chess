@@ -21,8 +21,8 @@ selected_piece = None
 valid_moves = []
 current_turn = "RED"
 winner = None
+chain_capture = False  # NEW
 
-# Store pieces with owner
 def reset_game():
     return {
         (0, 0): "RED",
@@ -36,15 +36,32 @@ pieces = reset_game()
 def get_valid_moves(pos):
     row, col = pos
     moves = []
+
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     for dr, dc in directions:
+        # Normal move
         r, c = row + dr, col + dc
         if 0 <= r < ROWS and 0 <= c < COLS:
-            if (r, c) not in pieces or pieces[(r, c)] != current_turn:
+            if (r, c) not in pieces:
                 moves.append((r, c))
 
+        # Jump move (capture)
+        jr, jc = row + 2 * dr, col + 2 * dc
+        mid = (row + dr, col + dc)
+
+        if 0 <= jr < ROWS and 0 <= jc < COLS:
+            if mid in pieces and pieces[mid] != current_turn:
+                if (jr, jc) not in pieces:
+                    moves.append((jr, jc))
+
     return moves
+
+def get_captured_piece(start, end):
+    # If jump, return the jumped piece
+    if abs(start[0] - end[0]) == 2 or abs(start[1] - end[1]) == 2:
+        return ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
+    return None
 
 def check_winner():
     red_exists = any(owner == "RED" for owner in pieces.values())
@@ -70,6 +87,7 @@ while running:
                 selected_piece = None
                 valid_moves = []
                 winner = None
+                chain_capture = False
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             mx, my = pygame.mouse.get_pos()
@@ -80,24 +98,42 @@ while running:
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
 
-                if clicked in pieces and pieces[clicked] == current_turn:
+                # Select piece
+                if not chain_capture:
+                    if clicked in pieces and pieces[clicked] == current_turn:
+                        selected_piece = clicked
+                        valid_moves = get_valid_moves(clicked)
+
+                # Move
+                if selected_piece and clicked in valid_moves:
+                    captured = get_captured_piece(selected_piece, clicked)
+
+                    if captured:
+                        pieces.pop(captured)
+
+                    pieces[clicked] = current_turn
+                    pieces.pop(selected_piece)
+
+                    # Check for chain capture
                     selected_piece = clicked
-                    valid_moves = get_valid_moves(clicked)
+                    new_moves = get_valid_moves(clicked)
 
-                else:
-                    if selected_piece and clicked in valid_moves:
-                        if clicked in pieces:
-                            pieces.pop(clicked)
+                    # Only allow further captures
+                    capture_moves = [
+                        m for m in new_moves
+                        if get_captured_piece(clicked, m)
+                    ]
 
-                        pieces[clicked] = current_turn
-                        pieces.pop(selected_piece)
-
+                    if captured and capture_moves:
+                        valid_moves = capture_moves
+                        chain_capture = True
+                    else:
                         current_turn = "BLUE" if current_turn == "RED" else "RED"
-
-                        winner = check_winner()
-
                         selected_piece = None
                         valid_moves = []
+                        chain_capture = False
+
+                    winner = check_winner()
 
     screen.fill(BACKGROUND)
 
