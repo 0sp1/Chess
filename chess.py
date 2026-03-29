@@ -21,51 +21,57 @@ selected_piece = None
 valid_moves = []
 current_turn = "RED"
 winner = None
-chain_capture = False  # NEW
+chain_capture = False
 
 def reset_game():
     return {
-        (0, 0): "RED",
-        (1, 1): "RED",
-        (6, 6): "BLUE",
-        (7, 7): "BLUE"
+        (0, 0): ("RED", False),
+        (1, 1): ("RED", False),
+        (6, 6): ("BLUE", False),
+        (7, 7): ("BLUE", False)
     }
 
 pieces = reset_game()
 
 def get_valid_moves(pos):
     row, col = pos
+    owner, king = pieces[pos]
     moves = []
 
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     for dr, dc in directions:
-        # Normal move
         r, c = row + dr, col + dc
         if 0 <= r < ROWS and 0 <= c < COLS:
             if (r, c) not in pieces:
                 moves.append((r, c))
 
-        # Jump move (capture)
         jr, jc = row + 2 * dr, col + 2 * dc
         mid = (row + dr, col + dc)
 
         if 0 <= jr < ROWS and 0 <= jc < COLS:
-            if mid in pieces and pieces[mid] != current_turn:
+            if mid in pieces and pieces[mid][0] != owner:
                 if (jr, jc) not in pieces:
                     moves.append((jr, jc))
 
     return moves
 
 def get_captured_piece(start, end):
-    # If jump, return the jumped piece
     if abs(start[0] - end[0]) == 2 or abs(start[1] - end[1]) == 2:
         return ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
     return None
 
+def promote(pos):
+    row, col = pos
+    owner, king = pieces[pos]
+    if owner == "RED" and row == ROWS - 1:
+        pieces[pos] = (owner, True)
+    if owner == "BLUE" and row == 0:
+        pieces[pos] = (owner, True)
+
 def check_winner():
-    red_exists = any(owner == "RED" for owner in pieces.values())
-    blue_exists = any(owner == "BLUE" for owner in pieces.values())
+    red_exists = any(owner == "RED" for owner, _ in pieces.values())
+    blue_exists = any(owner == "BLUE" for owner, _ in pieces.values())
 
     if not red_exists:
         return "BLUE"
@@ -98,27 +104,26 @@ while running:
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
 
-                # Select piece
                 if not chain_capture:
-                    if clicked in pieces and pieces[clicked] == current_turn:
+                    if clicked in pieces and pieces[clicked][0] == current_turn:
                         selected_piece = clicked
                         valid_moves = get_valid_moves(clicked)
 
-                # Move
                 if selected_piece and clicked in valid_moves:
                     captured = get_captured_piece(selected_piece, clicked)
 
                     if captured:
                         pieces.pop(captured)
 
-                    pieces[clicked] = current_turn
+                    owner, king = pieces[selected_piece]
+                    pieces[clicked] = (owner, king)
                     pieces.pop(selected_piece)
 
-                    # Check for chain capture
+                    promote(clicked)
+
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
 
-                    # Only allow further captures
                     capture_moves = [
                         m for m in new_moves
                         if get_captured_piece(clicked, m)
@@ -153,8 +158,11 @@ while running:
 
             if (row, col) in pieces:
                 center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
-                color = RED if pieces[(row, col)] == "RED" else BLUE
+                owner, king = pieces[(row, col)]
+                color = RED if owner == "RED" else BLUE
                 pygame.draw.circle(screen, color, center, SQUARE_SIZE // 3)
+                if king:
+                    pygame.draw.circle(screen, (255, 255, 255), center, SQUARE_SIZE // 6)
 
     if winner:
         text = font.render(f"{winner} WINS! Press R to restart", True, (255, 255, 255))
