@@ -11,17 +11,20 @@ BACKGROUND = (128, 0, 128)
 HIGHLIGHT = (255, 255, 0)
 RED = (200, 0, 0)
 BLUE = (0, 0, 200)
+WHITE = (255, 255, 255)
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 48)
+font = pygame.font.SysFont(None, 36)
+big_font = pygame.font.SysFont(None, 48)
 
 selected_piece = None
 valid_moves = []
 current_turn = "RED"
 winner = None
 chain_capture = False
+move_count = 0
 
 def reset_game():
     return {
@@ -37,7 +40,6 @@ def get_valid_moves(pos):
     row, col = pos
     owner, king = pieces[pos]
     moves = []
-
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
     for dr, dc in directions:
@@ -94,10 +96,10 @@ while running:
                 valid_moves = []
                 winner = None
                 chain_capture = False
+                move_count = 0
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             mx, my = pygame.mouse.get_pos()
-
             col = (mx - MARGIN) // SQUARE_SIZE
             row = (my - MARGIN) // SQUARE_SIZE
 
@@ -137,6 +139,7 @@ while running:
                         selected_piece = None
                         valid_moves = []
                         chain_capture = False
+                        move_count += 1
 
                     winner = check_winner()
 
@@ -162,10 +165,16 @@ while running:
                 color = RED if owner == "RED" else BLUE
                 pygame.draw.circle(screen, color, center, SQUARE_SIZE // 3)
                 if king:
-                    pygame.draw.circle(screen, (255, 255, 255), center, SQUARE_SIZE // 6)
+                    pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE // 6)
+
+    turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
+    move_text = font.render(f"Moves: {move_count}", True, WHITE)
+
+    screen.blit(turn_text, (20, 5))
+    screen.blit(move_text, (200, 5))
 
     if winner:
-        text = font.render(f"{winner} WINS! Press R to restart", True, (255, 255, 255))
+        text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
         screen.blit(text, (WIDTH // 2 - text.get_width() // 2, 10))
 
     pygame.display.flip()
