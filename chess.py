@@ -40,7 +40,8 @@ def get_valid_moves(pos):
     row, col = pos
     owner, king = pieces[pos]
     moves = []
-    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    captures = []
+    directions = [(-1,0),(1,0),(0,-1),(0,1)]
 
     for dr, dc in directions:
         r, c = row + dr, col + dc
@@ -48,33 +49,41 @@ def get_valid_moves(pos):
             if (r, c) not in pieces:
                 moves.append((r, c))
 
-        jr, jc = row + 2 * dr, col + 2 * dc
+        jr, jc = row + 2*dr, col + 2*dc
         mid = (row + dr, col + dc)
 
         if 0 <= jr < ROWS and 0 <= jc < COLS:
-            if mid in pieces and pieces[mid][0] != owner:
-                if (jr, jc) not in pieces:
-                    moves.append((jr, jc))
+            if mid in pieces and pieces[mid][0] != owner and (jr, jc) not in pieces:
+                captures.append((jr, jc))
 
-    return moves
+    return captures if captures else moves
+
+def get_all_captures(player):
+    all_caps = []
+    for pos, (owner, _) in pieces.items():
+        if owner == player:
+            moves = get_valid_moves(pos)
+            for m in moves:
+                if get_captured_piece(pos, m):
+                    all_caps.append((pos, m))
+    return all_caps
 
 def get_captured_piece(start, end):
-    if abs(start[0] - end[0]) == 2 or abs(start[1] - end[1]) == 2:
-        return ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
+    if abs(start[0]-end[0]) == 2 or abs(start[1]-end[1]) == 2:
+        return ((start[0]+end[0])//2, (start[1]+end[1])//2)
     return None
 
 def promote(pos):
     row, col = pos
     owner, king = pieces[pos]
-    if owner == "RED" and row == ROWS - 1:
+    if owner == "RED" and row == ROWS-1:
         pieces[pos] = (owner, True)
     if owner == "BLUE" and row == 0:
         pieces[pos] = (owner, True)
 
 def check_winner():
-    red_exists = any(owner == "RED" for owner, _ in pieces.values())
-    blue_exists = any(owner == "BLUE" for owner, _ in pieces.values())
-
+    red_exists = any(o == "RED" for o, _ in pieces.values())
+    blue_exists = any(o == "BLUE" for o, _ in pieces.values())
     if not red_exists:
         return "BLUE"
     if not blue_exists:
@@ -105,11 +114,16 @@ while running:
 
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
+                forced = get_all_captures(current_turn)
 
                 if not chain_capture:
                     if clicked in pieces and pieces[clicked][0] == current_turn:
-                        selected_piece = clicked
-                        valid_moves = get_valid_moves(clicked)
+                        moves = get_valid_moves(clicked)
+                        if forced:
+                            moves = [m for m in moves if get_captured_piece(clicked, m)]
+                        if moves:
+                            selected_piece = clicked
+                            valid_moves = moves
 
                 if selected_piece and clicked in valid_moves:
                     captured = get_captured_piece(selected_piece, clicked)
@@ -125,11 +139,7 @@ while running:
 
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
-
-                    capture_moves = [
-                        m for m in new_moves
-                        if get_captured_piece(clicked, m)
-                    ]
+                    capture_moves = [m for m in new_moves if get_captured_piece(clicked, m)]
 
                     if captured and capture_moves:
                         valid_moves = capture_moves
