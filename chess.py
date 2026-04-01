@@ -1,4 +1,5 @@
 import pygame
+import copy
 
 WIDTH, HEIGHT = 800, 800
 ROWS, COLS = 8, 8
@@ -25,6 +26,9 @@ current_turn = "RED"
 winner = None
 chain_capture = False
 move_count = 0
+
+# ✅ NEW: history for undo
+history = []
 
 def reset_game():
     return {
@@ -106,6 +110,14 @@ while running:
                 winner = None
                 chain_capture = False
                 move_count = 0
+                history.clear()
+
+            # ✅ UNDO FEATURE
+            if event.key == pygame.K_u and history:
+                pieces, current_turn, move_count, chain_capture = history.pop()
+                selected_piece = None
+                valid_moves = []
+                winner = None
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             mx, my = pygame.mouse.get_pos()
@@ -126,6 +138,15 @@ while running:
                             valid_moves = moves
 
                 if selected_piece and clicked in valid_moves:
+                    
+                    # ✅ SAVE STATE BEFORE MOVE
+                    history.append((
+                        copy.deepcopy(pieces),
+                        current_turn,
+                        move_count,
+                        chain_capture
+                    ))
+
                     captured = get_captured_piece(selected_piece, clicked)
 
                     if captured:
@@ -179,9 +200,11 @@ while running:
 
     turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
     move_text = font.render(f"Moves: {move_count}", True, WHITE)
+    undo_text = font.render("Press U to undo", True, WHITE)
 
     screen.blit(turn_text, (20, 5))
     screen.blit(move_text, (200, 5))
+    screen.blit(undo_text, (400, 5))
 
     if winner:
         text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
