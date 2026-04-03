@@ -27,9 +27,11 @@ current_turn = "RED"
 winner = None
 chain_capture = False
 move_count = 0
-
 history = []
 AI_ENABLED = True
+
+red_score = 0
+blue_score = 0
 
 def reset_game():
     return {
@@ -95,6 +97,21 @@ def check_winner():
         return "RED"
     return None
 
+def apply_move(start, end):
+    global red_score, blue_score
+    captured = get_captured_piece(start, end)
+    if captured:
+        if pieces[captured][0] == "RED":
+            blue_score += 1
+        else:
+            red_score += 1
+        pieces.pop(captured)
+    owner, king = pieces[start]
+    pieces[end] = (owner, king)
+    pieces.pop(start)
+    promote(end)
+    return captured
+
 def ai_move():
     global current_turn, selected_piece, valid_moves, chain_capture, move_count, winner
 
@@ -107,10 +124,8 @@ def ai_move():
     for pos, (owner, _) in pieces.items():
         if owner == "BLUE":
             moves = get_valid_moves(pos)
-
             if forced:
                 moves = [m for m in moves if get_captured_piece(pos, m)]
-
             for m in moves:
                 all_moves.append((pos, m))
 
@@ -119,26 +134,11 @@ def ai_move():
 
     capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
     move_list = capture_moves if capture_moves else all_moves
-
     start, end = random.choice(move_list)
 
-    history.append((
-        copy.deepcopy(pieces),
-        current_turn,
-        move_count,
-        chain_capture
-    ))
+    history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
 
-    captured = get_captured_piece(start, end)
-
-    if captured:
-        pieces.pop(captured)
-
-    owner, king = pieces[start]
-    pieces[end] = (owner, king)
-    pieces.pop(start)
-
-    promote(end)
+    captured = apply_move(start, end)
 
     new_moves = get_valid_moves(end)
     capture_moves = [m for m in new_moves if get_captured_piece(end, m)]
@@ -173,9 +173,11 @@ while running:
                 chain_capture = False
                 move_count = 0
                 history.clear()
+                red_score = 0
+                blue_score = 0
 
             if event.key == pygame.K_u and history:
-                pieces, current_turn, move_count, chain_capture = history.pop()
+                pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
                 selected_piece = None
                 valid_moves = []
                 winner = None
@@ -202,23 +204,9 @@ while running:
                             valid_moves = moves
 
                 if selected_piece and clicked in valid_moves:
-                    history.append((
-                        copy.deepcopy(pieces),
-                        current_turn,
-                        move_count,
-                        chain_capture
-                    ))
+                    history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
 
-                    captured = get_captured_piece(selected_piece, clicked)
-
-                    if captured:
-                        pieces.pop(captured)
-
-                    owner, king = pieces[selected_piece]
-                    pieces[clicked] = (owner, king)
-                    pieces.pop(selected_piece)
-
-                    promote(clicked)
+                    captured = apply_move(selected_piece, clicked)
 
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
@@ -266,11 +254,11 @@ while running:
 
     turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
     move_text = font.render(f"Moves: {move_count}", True, WHITE)
-    undo_text = font.render("Press U to undo", True, WHITE)
+    score_text = font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE)
 
     screen.blit(turn_text, (20, 5))
     screen.blit(move_text, (200, 5))
-    screen.blit(undo_text, (400, 5))
+    screen.blit(score_text, (400, 5))
 
     if winner:
         text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
