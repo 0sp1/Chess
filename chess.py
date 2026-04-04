@@ -46,15 +46,13 @@ pieces = reset_game()
 def get_valid_moves(pos):
     row, col = pos
     owner, king = pieces[pos]
-    moves = []
-    captures = []
+    moves, captures = [], []
     directions = [(-1,0),(1,0),(0,-1),(0,1)]
 
     for dr, dc in directions:
         r, c = row + dr, col + dc
-        if 0 <= r < ROWS and 0 <= c < COLS:
-            if (r, c) not in pieces:
-                moves.append((r, c))
+        if 0 <= r < ROWS and 0 <= c < COLS and (r, c) not in pieces:
+            moves.append((r, c))
 
         jr, jc = row + 2*dr, col + 2*dc
         mid = (row + dr, col + dc)
@@ -69,8 +67,7 @@ def get_all_captures(player):
     all_caps = []
     for pos, (owner, _) in pieces.items():
         if owner == player:
-            moves = get_valid_moves(pos)
-            for m in moves:
+            for m in get_valid_moves(pos):
                 if get_captured_piece(pos, m):
                     all_caps.append((pos, m))
     return all_caps
@@ -114,9 +111,6 @@ def apply_move(start, end):
 
 def ai_move():
     global current_turn, selected_piece, valid_moves, chain_capture, move_count, winner
-
-    if current_turn != "BLUE":
-        return
 
     forced = get_all_captures("BLUE")
     all_moves = []
@@ -181,6 +175,9 @@ while running:
                 selected_piece = None
                 valid_moves = []
                 winner = None
+
+            if event.key == pygame.K_a:
+                AI_ENABLED = not AI_ENABLED
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             if AI_ENABLED and current_turn == "BLUE":
@@ -255,10 +252,12 @@ while running:
     turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
     move_text = font.render(f"Moves: {move_count}", True, WHITE)
     score_text = font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE)
+    ai_text = font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE)
 
     screen.blit(turn_text, (20, 5))
     screen.blit(move_text, (200, 5))
     screen.blit(score_text, (400, 5))
+    screen.blit(ai_text, (650, 5))
 
     if winner:
         text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
