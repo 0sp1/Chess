@@ -29,6 +29,7 @@ chain_capture = False
 move_count = 0
 history = []
 AI_ENABLED = True
+last_move = None
 
 red_score = 0
 blue_score = 0
@@ -48,19 +49,15 @@ def get_valid_moves(pos):
     owner, king = pieces[pos]
     moves, captures = [], []
     directions = [(-1,0),(1,0),(0,-1),(0,1)]
-
     for dr, dc in directions:
         r, c = row + dr, col + dc
         if 0 <= r < ROWS and 0 <= c < COLS and (r, c) not in pieces:
             moves.append((r, c))
-
         jr, jc = row + 2*dr, col + 2*dc
         mid = (row + dr, col + dc)
-
         if 0 <= jr < ROWS and 0 <= jc < COLS:
             if mid in pieces and pieces[mid][0] != owner and (jr, jc) not in pieces:
                 captures.append((jr, jc))
-
     return captures if captures else moves
 
 def get_all_captures(player):
@@ -95,7 +92,7 @@ def check_winner():
     return None
 
 def apply_move(start, end):
-    global red_score, blue_score
+    global red_score, blue_score, last_move
     captured = get_captured_piece(start, end)
     if captured:
         if pieces[captured][0] == "RED":
@@ -107,14 +104,13 @@ def apply_move(start, end):
     pieces[end] = (owner, king)
     pieces.pop(start)
     promote(end)
+    last_move = (start, end)
     return captured
 
 def ai_move():
     global current_turn, selected_piece, valid_moves, chain_capture, move_count, winner
-
     forced = get_all_captures("BLUE")
     all_moves = []
-
     for pos, (owner, _) in pieces.items():
         if owner == "BLUE":
             moves = get_valid_moves(pos)
@@ -122,21 +118,15 @@ def ai_move():
                 moves = [m for m in moves if get_captured_piece(pos, m)]
             for m in moves:
                 all_moves.append((pos, m))
-
     if not all_moves:
         return
-
     capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
     move_list = capture_moves if capture_moves else all_moves
     start, end = random.choice(move_list)
-
     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
-
     captured = apply_move(start, end)
-
     new_moves = get_valid_moves(end)
     capture_moves = [m for m in new_moves if get_captured_piece(end, m)]
-
     if captured and capture_moves:
         selected_piece = end
         valid_moves = capture_moves
@@ -147,7 +137,6 @@ def ai_move():
         valid_moves = []
         chain_capture = False
         move_count += 1
-
     winner = check_winner()
 
 running = True
@@ -156,7 +145,6 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
                 pieces = reset_game()
@@ -169,28 +157,24 @@ while running:
                 history.clear()
                 red_score = 0
                 blue_score = 0
-
+                last_move = None
             if event.key == pygame.K_u and history:
                 pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
                 selected_piece = None
                 valid_moves = []
                 winner = None
-
+                last_move = None
             if event.key == pygame.K_a:
                 AI_ENABLED = not AI_ENABLED
-
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             if AI_ENABLED and current_turn == "BLUE":
                 continue
-
             mx, my = pygame.mouse.get_pos()
             col = (mx - MARGIN) // SQUARE_SIZE
             row = (my - MARGIN) // SQUARE_SIZE
-
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
                 forced = get_all_captures(current_turn)
-
                 if not chain_capture:
                     if clicked in pieces and pieces[clicked][0] == current_turn:
                         moves = get_valid_moves(clicked)
@@ -199,16 +183,12 @@ while running:
                         if moves:
                             selected_piece = clicked
                             valid_moves = moves
-
                 if selected_piece and clicked in valid_moves:
                     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
-
                     captured = apply_move(selected_piece, clicked)
-
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
                     capture_moves = [m for m in new_moves if get_captured_piece(clicked, m)]
-
                     if captured and capture_moves:
                         valid_moves = capture_moves
                         chain_capture = True
@@ -218,9 +198,7 @@ while running:
                         valid_moves = []
                         chain_capture = False
                         move_count += 1
-
                     winner = check_winner()
-
     if AI_ENABLED and current_turn == "BLUE" and not winner:
         pygame.time.delay(300)
         ai_move()
@@ -232,15 +210,13 @@ while running:
             color = GREEN if (row + col) % 2 == 0 else BLACK
             x = MARGIN + col * SQUARE_SIZE
             y = MARGIN + row * SQUARE_SIZE
-
             pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
-
-            if selected_piece == (row, col):
+            if last_move and ((row, col) == last_move[0] or (row, col) == last_move[1]):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
-
-            if (row, col) in valid_moves:
+            elif selected_piece == (row, col):
+                pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
+            elif (row, col) in valid_moves:
                 pygame.draw.rect(screen, (0, 0, 255), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
-
             if (row, col) in pieces:
                 center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
                 owner, king = pieces[(row, col)]
