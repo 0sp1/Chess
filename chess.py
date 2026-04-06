@@ -30,7 +30,6 @@ move_count = 0
 history = []
 AI_ENABLED = True
 last_move = None
-
 red_score = 0
 blue_score = 0
 
@@ -139,6 +138,17 @@ def ai_move():
         move_count += 1
     winner = check_winner()
 
+def highlight_chain_moves(pos, moves):
+    chain_moves = []
+    for m in moves:
+        captured = get_captured_piece(pos, m)
+        if captured:
+            new_moves = get_valid_moves(m)
+            next_caps = [nm for nm in new_moves if get_captured_piece(m, nm)]
+            if next_caps:
+                chain_moves.append(m)
+    return chain_moves
+
 running = True
 
 while running:
@@ -183,6 +193,7 @@ while running:
                         if moves:
                             selected_piece = clicked
                             valid_moves = moves
+                            valid_moves += highlight_chain_moves(clicked, moves)
                 if selected_piece and clicked in valid_moves:
                     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
                     captured = apply_move(selected_piece, clicked)
