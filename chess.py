@@ -1,6 +1,7 @@
 import pygame
 import copy
 import random
+import time
 
 WIDTH, HEIGHT = 800, 800
 ROWS, COLS = 8, 8
@@ -32,6 +33,8 @@ AI_ENABLED = True
 last_move = None
 red_score = 0
 blue_score = 0
+turn_start_time = time.time()
+TURN_LIMIT = 10
 
 def reset_game():
     return {
@@ -106,8 +109,17 @@ def apply_move(start, end):
     last_move = (start, end)
     return captured
 
+def switch_turn():
+    global current_turn, selected_piece, valid_moves, chain_capture, move_count, turn_start_time
+    current_turn = "BLUE" if current_turn == "RED" else "RED"
+    selected_piece = None
+    valid_moves = []
+    chain_capture = False
+    move_count += 1
+    turn_start_time = time.time()
+
 def ai_move():
-    global current_turn, selected_piece, valid_moves, chain_capture, move_count, winner
+    global winner
     forced = get_all_captures("BLUE")
     all_moves = []
     for pos, (owner, _) in pieces.items():
@@ -127,15 +139,9 @@ def ai_move():
     new_moves = get_valid_moves(end)
     capture_moves = [m for m in new_moves if get_captured_piece(end, m)]
     if captured and capture_moves:
-        selected_piece = end
-        valid_moves = capture_moves
         ai_move()
     else:
-        current_turn = "RED"
-        selected_piece = None
-        valid_moves = []
-        chain_capture = False
-        move_count += 1
+        switch_turn()
     winner = check_winner()
 
 def highlight_chain_moves(pos, moves):
@@ -152,9 +158,14 @@ def highlight_chain_moves(pos, moves):
 running = True
 
 while running:
+    if not winner:
+        if time.time() - turn_start_time > TURN_LIMIT:
+            switch_turn()
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
                 pieces = reset_game()
@@ -168,23 +179,31 @@ while running:
                 red_score = 0
                 blue_score = 0
                 last_move = None
+                turn_start_time = time.time()
+
             if event.key == pygame.K_u and history:
                 pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
                 selected_piece = None
                 valid_moves = []
                 winner = None
                 last_move = None
+                turn_start_time = time.time()
+
             if event.key == pygame.K_a:
                 AI_ENABLED = not AI_ENABLED
+
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             if AI_ENABLED and current_turn == "BLUE":
                 continue
+
             mx, my = pygame.mouse.get_pos()
             col = (mx - MARGIN) // SQUARE_SIZE
             row = (my - MARGIN) // SQUARE_SIZE
+
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
                 forced = get_all_captures(current_turn)
+
                 if not chain_capture:
                     if clicked in pieces and pieces[clicked][0] == current_turn:
                         moves = get_valid_moves(clicked)
@@ -192,24 +211,23 @@ while running:
                             moves = [m for m in moves if get_captured_piece(clicked, m)]
                         if moves:
                             selected_piece = clicked
-                            valid_moves = moves
-                            valid_moves += highlight_chain_moves(clicked, moves)
+                            valid_moves = moves + highlight_chain_moves(clicked, moves)
+
                 if selected_piece and clicked in valid_moves:
                     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
                     captured = apply_move(selected_piece, clicked)
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
                     capture_moves = [m for m in new_moves if get_captured_piece(clicked, m)]
+
                     if captured and capture_moves:
                         valid_moves = capture_moves
                         chain_capture = True
                     else:
-                        current_turn = "BLUE" if current_turn == "RED" else "RED"
-                        selected_piece = None
-                        valid_moves = []
-                        chain_capture = False
-                        move_count += 1
+                        switch_turn()
+
                     winner = check_winner()
+
     if AI_ENABLED and current_turn == "BLUE" and not winner:
         pygame.time.delay(300)
         ai_move()
@@ -222,12 +240,14 @@ while running:
             x = MARGIN + col * SQUARE_SIZE
             y = MARGIN + row * SQUARE_SIZE
             pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
+
             if last_move and ((row, col) == last_move[0] or (row, col) == last_move[1]):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
             elif selected_piece == (row, col):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
             elif (row, col) in valid_moves:
                 pygame.draw.rect(screen, (0, 0, 255), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
+
             if (row, col) in pieces:
                 center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
                 owner, king = pieces[(row, col)]
@@ -236,11 +256,14 @@ while running:
                 if king:
                     pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE // 6)
 
+    remaining_time = max(0, TURN_LIMIT - int(time.time() - turn_start_time))
+    timer_text = font.render(f"Time: {remaining_time}", True, WHITE)
     turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
     move_text = font.render(f"Moves: {move_count}", True, WHITE)
     score_text = font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE)
     ai_text = font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE)
 
+    screen.blit(timer_text, (20, 40))
     screen.blit(turn_text, (20, 5))
     screen.blit(move_text, (200, 5))
     screen.blit(score_text, (400, 5))
