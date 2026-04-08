@@ -35,6 +35,7 @@ red_score = 0
 blue_score = 0
 turn_start_time = time.time()
 TURN_LIMIT = 10
+hint_move = None
 
 def reset_game():
     return {
@@ -110,13 +111,14 @@ def apply_move(start, end):
     return captured
 
 def switch_turn():
-    global current_turn, selected_piece, valid_moves, chain_capture, move_count, turn_start_time
+    global current_turn, selected_piece, valid_moves, chain_capture, move_count, turn_start_time, hint_move
     current_turn = "BLUE" if current_turn == "RED" else "RED"
     selected_piece = None
     valid_moves = []
     chain_capture = False
     move_count += 1
     turn_start_time = time.time()
+    hint_move = None
 
 def ai_move():
     global winner
@@ -144,23 +146,26 @@ def ai_move():
         switch_turn()
     winner = check_winner()
 
-def highlight_chain_moves(pos, moves):
-    chain_moves = []
-    for m in moves:
-        captured = get_captured_piece(pos, m)
-        if captured:
-            new_moves = get_valid_moves(m)
-            next_caps = [nm for nm in new_moves if get_captured_piece(m, nm)]
-            if next_caps:
-                chain_moves.append(m)
-    return chain_moves
+def get_hint(player):
+    forced = get_all_captures(player)
+    all_moves = []
+    for pos, (owner, _) in pieces.items():
+        if owner == player:
+            moves = get_valid_moves(pos)
+            if forced:
+                moves = [m for m in moves if get_captured_piece(pos, m)]
+            for m in moves:
+                all_moves.append((pos, m))
+    if not all_moves:
+        return None
+    capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
+    return random.choice(capture_moves if capture_moves else all_moves)
 
 running = True
 
 while running:
-    if not winner:
-        if time.time() - turn_start_time > TURN_LIMIT:
-            switch_turn()
+    if not winner and time.time() - turn_start_time > TURN_LIMIT:
+        switch_turn()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -180,6 +185,7 @@ while running:
                 blue_score = 0
                 last_move = None
                 turn_start_time = time.time()
+                hint_move = None
 
             if event.key == pygame.K_u and history:
                 pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
@@ -188,9 +194,13 @@ while running:
                 winner = None
                 last_move = None
                 turn_start_time = time.time()
+                hint_move = None
 
             if event.key == pygame.K_a:
                 AI_ENABLED = not AI_ENABLED
+
+            if event.key == pygame.K_h:
+                hint_move = get_hint(current_turn)
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner:
             if AI_ENABLED and current_turn == "BLUE":
@@ -211,7 +221,7 @@ while running:
                             moves = [m for m in moves if get_captured_piece(clicked, m)]
                         if moves:
                             selected_piece = clicked
-                            valid_moves = moves + highlight_chain_moves(clicked, moves)
+                            valid_moves = moves
 
                 if selected_piece and clicked in valid_moves:
                     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
@@ -241,7 +251,9 @@ while running:
             y = MARGIN + row * SQUARE_SIZE
             pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
 
-            if last_move and ((row, col) == last_move[0] or (row, col) == last_move[1]):
+            if hint_move and (row, col) in hint_move:
+                pygame.draw.rect(screen, (255, 165, 0), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
+            elif last_move and ((row, col) == last_move[0] or (row, col) == last_move[1]):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
             elif selected_piece == (row, col):
                 pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
@@ -257,17 +269,11 @@ while running:
                     pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE // 6)
 
     remaining_time = max(0, TURN_LIMIT - int(time.time() - turn_start_time))
-    timer_text = font.render(f"Time: {remaining_time}", True, WHITE)
-    turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
-    move_text = font.render(f"Moves: {move_count}", True, WHITE)
-    score_text = font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE)
-    ai_text = font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE)
-
-    screen.blit(timer_text, (20, 40))
-    screen.blit(turn_text, (20, 5))
-    screen.blit(move_text, (200, 5))
-    screen.blit(score_text, (400, 5))
-    screen.blit(ai_text, (650, 5))
+    screen.blit(font.render(f"Time: {remaining_time}", True, WHITE), (20, 40))
+    screen.blit(font.render(f"Turn: {current_turn}", True, WHITE), (20, 5))
+    screen.blit(font.render(f"Moves: {move_count}", True, WHITE), (200, 5))
+    screen.blit(font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE), (400, 5))
+    screen.blit(font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE), (650, 5))
 
     if winner:
         text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
