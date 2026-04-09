@@ -36,6 +36,7 @@ blue_score = 0
 turn_start_time = time.time()
 TURN_LIMIT = 10
 hint_move = None
+paused = False
 
 def reset_game():
     return {
@@ -95,7 +96,7 @@ def check_winner():
     return None
 
 def apply_move(start, end):
-    global red_score, blue_score, last_move
+    global red_score, blue_score, last_move, hint_move
     captured = get_captured_piece(start, end)
     if captured:
         if pieces[captured][0] == "RED":
@@ -108,6 +109,7 @@ def apply_move(start, end):
     pieces.pop(start)
     promote(end)
     last_move = (start, end)
+    hint_move = None
     return captured
 
 def switch_turn():
@@ -164,7 +166,7 @@ def get_hint(player):
 running = True
 
 while running:
-    if not winner and time.time() - turn_start_time > TURN_LIMIT:
+    if not paused and not winner and time.time() - turn_start_time > TURN_LIMIT:
         switch_turn()
 
     for event in pygame.event.get():
@@ -172,6 +174,12 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_p:
+                paused = not paused
+
+            if paused:
+                continue
+
             if event.key == pygame.K_r:
                 pieces = reset_game()
                 current_turn = "RED"
@@ -202,7 +210,7 @@ while running:
             if event.key == pygame.K_h:
                 hint_move = get_hint(current_turn)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and not winner:
+        if event.type == pygame.MOUSEBUTTONDOWN and not winner and not paused:
             if AI_ENABLED and current_turn == "BLUE":
                 continue
 
@@ -238,7 +246,7 @@ while running:
 
                     winner = check_winner()
 
-    if AI_ENABLED and current_turn == "BLUE" and not winner:
+    if AI_ENABLED and current_turn == "BLUE" and not winner and not paused:
         pygame.time.delay(300)
         ai_move()
 
@@ -269,11 +277,16 @@ while running:
                     pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE // 6)
 
     remaining_time = max(0, TURN_LIMIT - int(time.time() - turn_start_time))
+
     screen.blit(font.render(f"Time: {remaining_time}", True, WHITE), (20, 40))
     screen.blit(font.render(f"Turn: {current_turn}", True, WHITE), (20, 5))
     screen.blit(font.render(f"Moves: {move_count}", True, WHITE), (200, 5))
     screen.blit(font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE), (400, 5))
     screen.blit(font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE), (650, 5))
+
+    if paused:
+        text = big_font.render("PAUSED", True, WHITE)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
 
     if winner:
         text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
