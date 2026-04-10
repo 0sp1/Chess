@@ -2,6 +2,7 @@ import pygame
 import copy
 import random
 import time
+import pickle
 
 WIDTH, HEIGHT = 800, 800
 ROWS, COLS = 8, 8
@@ -163,6 +164,28 @@ def get_hint(player):
     capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
     return random.choice(capture_moves if capture_moves else all_moves)
 
+def save_game():
+    data = {
+        "pieces": pieces,
+        "turn": current_turn,
+        "scores": (red_score, blue_score),
+        "move_count": move_count
+    }
+    with open("save.dat", "wb") as f:
+        pickle.dump(data, f)
+
+def load_game():
+    global pieces, current_turn, red_score, blue_score, move_count
+    try:
+        with open("save.dat", "rb") as f:
+            data = pickle.load(f)
+        pieces = data["pieces"]
+        current_turn = data["turn"]
+        red_score, blue_score = data["scores"]
+        move_count = data["move_count"]
+    except:
+        pass
+
 running = True
 
 while running:
@@ -176,10 +199,8 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 paused = not paused
-
             if paused:
                 continue
-
             if event.key == pygame.K_r:
                 pieces = reset_game()
                 current_turn = "RED"
@@ -194,7 +215,6 @@ while running:
                 last_move = None
                 turn_start_time = time.time()
                 hint_move = None
-
             if event.key == pygame.K_u and history:
                 pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
                 selected_piece = None
@@ -203,25 +223,24 @@ while running:
                 last_move = None
                 turn_start_time = time.time()
                 hint_move = None
-
             if event.key == pygame.K_a:
                 AI_ENABLED = not AI_ENABLED
-
             if event.key == pygame.K_h:
                 hint_move = get_hint(current_turn)
+            if event.key == pygame.K_s:
+                save_game()
+            if event.key == pygame.K_l:
+                load_game()
 
         if event.type == pygame.MOUSEBUTTONDOWN and not winner and not paused:
             if AI_ENABLED and current_turn == "BLUE":
                 continue
-
             mx, my = pygame.mouse.get_pos()
             col = (mx - MARGIN) // SQUARE_SIZE
             row = (my - MARGIN) // SQUARE_SIZE
-
             if 0 <= row < ROWS and 0 <= col < COLS:
                 clicked = (row, col)
                 forced = get_all_captures(current_turn)
-
                 if not chain_capture:
                     if clicked in pieces and pieces[clicked][0] == current_turn:
                         moves = get_valid_moves(clicked)
@@ -230,20 +249,17 @@ while running:
                         if moves:
                             selected_piece = clicked
                             valid_moves = moves
-
                 if selected_piece and clicked in valid_moves:
                     history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
                     captured = apply_move(selected_piece, clicked)
                     selected_piece = clicked
                     new_moves = get_valid_moves(clicked)
                     capture_moves = [m for m in new_moves if get_captured_piece(clicked, m)]
-
                     if captured and capture_moves:
                         valid_moves = capture_moves
                         chain_capture = True
                     else:
                         switch_turn()
-
                     winner = check_winner()
 
     if AI_ENABLED and current_turn == "BLUE" and not winner and not paused:
