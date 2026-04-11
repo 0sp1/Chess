@@ -1,21 +1,18 @@
-import pygame
-import copy
-import random
-import time
-import pickle
+import pygame, copy, random, time, pickle
 
 WIDTH, HEIGHT = 800, 800
 ROWS, COLS = 8, 8
 SQUARE_SIZE = 75
 MARGIN = 20
 
-GREEN = (0, 128, 0)
-BLACK = (0, 0, 0)
-BACKGROUND = (128, 0, 128)
-HIGHLIGHT = (255, 255, 0)
-RED = (200, 0, 0)
-BLUE = (0, 0, 200)
-WHITE = (255, 255, 255)
+GREEN = (0,128,0)
+BLACK = (0,0,0)
+BACKGROUND = (128,0,128)
+HIGHLIGHT = (255,255,0)
+RED = (200,0,0)
+BLUE = (0,0,200)
+WHITE = (255,255,255)
+ORANGE = (255,165,0)
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -39,274 +36,225 @@ TURN_LIMIT = 10
 hint_move = None
 paused = False
 
+replay_mode = False
+replay_index = 0
+
 def reset_game():
-    return {
-        (0, 0): ("RED", False),
-        (1, 1): ("RED", False),
-        (6, 6): ("BLUE", False),
-        (7, 7): ("BLUE", False)
-    }
+    return {(0,0):("RED",False),(1,1):("RED",False),(6,6):("BLUE",False),(7,7):("BLUE",False)}
 
 pieces = reset_game()
 
 def get_valid_moves(pos):
-    row, col = pos
-    owner, king = pieces[pos]
-    moves, captures = [], []
-    directions = [(-1,0),(1,0),(0,-1),(0,1)]
-    for dr, dc in directions:
-        r, c = row + dr, col + dc
-        if 0 <= r < ROWS and 0 <= c < COLS and (r, c) not in pieces:
-            moves.append((r, c))
-        jr, jc = row + 2*dr, col + 2*dc
-        mid = (row + dr, col + dc)
-        if 0 <= jr < ROWS and 0 <= jc < COLS:
-            if mid in pieces and pieces[mid][0] != owner and (jr, jc) not in pieces:
-                captures.append((jr, jc))
+    row,col = pos
+    owner,_ = pieces[pos]
+    moves,captures = [],[]
+    for dr,dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+        r,c = row+dr,col+dc
+        if 0<=r<ROWS and 0<=c<COLS and (r,c) not in pieces:
+            moves.append((r,c))
+        jr,jc = row+2*dr,col+2*dc
+        mid = (row+dr,col+dc)
+        if 0<=jr<ROWS and 0<=jc<COLS:
+            if mid in pieces and pieces[mid][0]!=owner and (jr,jc) not in pieces:
+                captures.append((jr,jc))
     return captures if captures else moves
 
 def get_all_captures(player):
-    all_caps = []
-    for pos, (owner, _) in pieces.items():
-        if owner == player:
+    out=[]
+    for pos,(o,_) in pieces.items():
+        if o==player:
             for m in get_valid_moves(pos):
-                if get_captured_piece(pos, m):
-                    all_caps.append((pos, m))
-    return all_caps
+                if get_captured_piece(pos,m):
+                    out.append((pos,m))
+    return out
 
-def get_captured_piece(start, end):
-    if abs(start[0]-end[0]) == 2 or abs(start[1]-end[1]) == 2:
-        return ((start[0]+end[0])//2, (start[1]+end[1])//2)
-    return None
+def get_captured_piece(s,e):
+    if abs(s[0]-e[0])==2 or abs(s[1]-e[1])==2:
+        return ((s[0]+e[0])//2,(s[1]+e[1])//2)
 
 def promote(pos):
-    row, col = pos
-    owner, king = pieces[pos]
-    if owner == "RED" and row == ROWS-1:
-        pieces[pos] = (owner, True)
-    if owner == "BLUE" and row == 0:
-        pieces[pos] = (owner, True)
+    r,_ = pos
+    o,k = pieces[pos]
+    if (o=="RED" and r==ROWS-1) or (o=="BLUE" and r==0):
+        pieces[pos]=(o,True)
 
 def check_winner():
-    red_exists = any(o == "RED" for o, _ in pieces.values())
-    blue_exists = any(o == "BLUE" for o, _ in pieces.values())
-    if not red_exists:
-        return "BLUE"
-    if not blue_exists:
-        return "RED"
-    return None
+    r = any(o=="RED" for o,_ in pieces.values())
+    b = any(o=="BLUE" for o,_ in pieces.values())
+    if not r: return "BLUE"
+    if not b: return "RED"
 
-def apply_move(start, end):
-    global red_score, blue_score, last_move, hint_move
-    captured = get_captured_piece(start, end)
-    if captured:
-        if pieces[captured][0] == "RED":
-            blue_score += 1
-        else:
-            red_score += 1
-        pieces.pop(captured)
-    owner, king = pieces[start]
-    pieces[end] = (owner, king)
-    pieces.pop(start)
-    promote(end)
-    last_move = (start, end)
-    hint_move = None
-    return captured
+def apply_move(s,e):
+    global red_score,blue_score,last_move,hint_move
+    c = get_captured_piece(s,e)
+    if c:
+        if pieces[c][0]=="RED": blue_score+=1
+        else: red_score+=1
+        pieces.pop(c)
+    o,k = pieces[s]
+    pieces[e]=(o,k)
+    pieces.pop(s)
+    promote(e)
+    last_move=(s,e)
+    hint_move=None
+    return c
 
 def switch_turn():
-    global current_turn, selected_piece, valid_moves, chain_capture, move_count, turn_start_time, hint_move
-    current_turn = "BLUE" if current_turn == "RED" else "RED"
-    selected_piece = None
-    valid_moves = []
-    chain_capture = False
-    move_count += 1
-    turn_start_time = time.time()
-    hint_move = None
+    global current_turn,selected_piece,valid_moves,chain_capture,move_count,turn_start_time,hint_move
+    current_turn="BLUE" if current_turn=="RED" else "RED"
+    selected_piece=None
+    valid_moves=[]
+    chain_capture=False
+    move_count+=1
+    turn_start_time=time.time()
+    hint_move=None
 
 def ai_move():
     global winner
     forced = get_all_captures("BLUE")
-    all_moves = []
-    for pos, (owner, _) in pieces.items():
-        if owner == "BLUE":
-            moves = get_valid_moves(pos)
-            if forced:
-                moves = [m for m in moves if get_captured_piece(pos, m)]
-            for m in moves:
-                all_moves.append((pos, m))
-    if not all_moves:
-        return
-    capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
-    move_list = capture_moves if capture_moves else all_moves
-    start, end = random.choice(move_list)
-    history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
-    captured = apply_move(start, end)
-    new_moves = get_valid_moves(end)
-    capture_moves = [m for m in new_moves if get_captured_piece(end, m)]
-    if captured and capture_moves:
-        ai_move()
-    else:
-        switch_turn()
+    moves=[]
+    for p,(o,_) in pieces.items():
+        if o=="BLUE":
+            m=get_valid_moves(p)
+            if forced: m=[x for x in m if get_captured_piece(p,x)]
+            for x in m: moves.append((p,x))
+    if not moves: return
+    moves = [m for m in moves if get_captured_piece(*m)] or moves
+    s,e = random.choice(moves)
+    history.append((copy.deepcopy(pieces),current_turn,move_count,chain_capture,red_score,blue_score))
+    c = apply_move(s,e)
+    nxt = get_valid_moves(e)
+    caps = [m for m in nxt if get_captured_piece(e,m)]
+    if c and caps: ai_move()
+    else: switch_turn()
     winner = check_winner()
 
 def get_hint(player):
     forced = get_all_captures(player)
-    all_moves = []
-    for pos, (owner, _) in pieces.items():
-        if owner == player:
-            moves = get_valid_moves(pos)
-            if forced:
-                moves = [m for m in moves if get_captured_piece(pos, m)]
-            for m in moves:
-                all_moves.append((pos, m))
-    if not all_moves:
-        return None
-    capture_moves = [(s, e) for s, e in all_moves if get_captured_piece(s, e)]
-    return random.choice(capture_moves if capture_moves else all_moves)
+    moves=[]
+    for p,(o,_) in pieces.items():
+        if o==player:
+            m=get_valid_moves(p)
+            if forced: m=[x for x in m if get_captured_piece(p,x)]
+            for x in m: moves.append((p,x))
+    if not moves: return
+    moves = [m for m in moves if get_captured_piece(*m)] or moves
+    return random.choice(moves)
 
 def save_game():
-    data = {
-        "pieces": pieces,
-        "turn": current_turn,
-        "scores": (red_score, blue_score),
-        "move_count": move_count
-    }
-    with open("save.dat", "wb") as f:
-        pickle.dump(data, f)
+    with open("save.dat","wb") as f:
+        pickle.dump((pieces,current_turn,red_score,blue_score,move_count),f)
 
 def load_game():
-    global pieces, current_turn, red_score, blue_score, move_count
+    global pieces,current_turn,red_score,blue_score,move_count
     try:
-        with open("save.dat", "rb") as f:
-            data = pickle.load(f)
-        pieces = data["pieces"]
-        current_turn = data["turn"]
-        red_score, blue_score = data["scores"]
-        move_count = data["move_count"]
-    except:
-        pass
+        with open("save.dat","rb") as f:
+            pieces,current_turn,red_score,blue_score,move_count = pickle.load(f)
+    except: pass
 
-running = True
+running=True
 
 while running:
-    if not paused and not winner and time.time() - turn_start_time > TURN_LIMIT:
+    if not paused and not winner and not replay_mode and time.time()-turn_start_time>TURN_LIMIT:
         switch_turn()
 
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        if event.type==pygame.QUIT: running=False
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
-                paused = not paused
-            if paused:
-                continue
-            if event.key == pygame.K_r:
-                pieces = reset_game()
-                current_turn = "RED"
-                selected_piece = None
-                valid_moves = []
-                winner = None
-                chain_capture = False
-                move_count = 0
+        if event.type==pygame.KEYDOWN:
+            if event.key==pygame.K_p: paused=not paused
+            if event.key==pygame.K_t:
+                replay_mode = not replay_mode
+                replay_index = 0
+            if paused or replay_mode: continue
+
+            if event.key==pygame.K_r:
+                pieces=reset_game()
+                current_turn="RED"
                 history.clear()
-                red_score = 0
-                blue_score = 0
-                last_move = None
-                turn_start_time = time.time()
-                hint_move = None
-            if event.key == pygame.K_u and history:
-                pieces, current_turn, move_count, chain_capture, red_score, blue_score = history.pop()
-                selected_piece = None
-                valid_moves = []
-                winner = None
-                last_move = None
-                turn_start_time = time.time()
-                hint_move = None
-            if event.key == pygame.K_a:
-                AI_ENABLED = not AI_ENABLED
-            if event.key == pygame.K_h:
-                hint_move = get_hint(current_turn)
-            if event.key == pygame.K_s:
-                save_game()
-            if event.key == pygame.K_l:
-                load_game()
+                move_count=0
+                red_score=blue_score=0
+                winner=None
 
-        if event.type == pygame.MOUSEBUTTONDOWN and not winner and not paused:
-            if AI_ENABLED and current_turn == "BLUE":
-                continue
-            mx, my = pygame.mouse.get_pos()
-            col = (mx - MARGIN) // SQUARE_SIZE
-            row = (my - MARGIN) // SQUARE_SIZE
-            if 0 <= row < ROWS and 0 <= col < COLS:
-                clicked = (row, col)
-                forced = get_all_captures(current_turn)
+            if event.key==pygame.K_u and history:
+                pieces,current_turn,move_count,chain_capture,red_score,blue_score = history.pop()
+
+            if event.key==pygame.K_a: AI_ENABLED=not AI_ENABLED
+            if event.key==pygame.K_h: hint_move=get_hint(current_turn)
+            if event.key==pygame.K_s: save_game()
+            if event.key==pygame.K_l: load_game()
+
+        if event.type==pygame.MOUSEBUTTONDOWN and not winner and not paused and not replay_mode:
+            if AI_ENABLED and current_turn=="BLUE": continue
+            mx,my=pygame.mouse.get_pos()
+            col=(mx-MARGIN)//SQUARE_SIZE
+            row=(my-MARGIN)//SQUARE_SIZE
+            if 0<=row<ROWS and 0<=col<COLS:
+                clicked=(row,col)
+                forced=get_all_captures(current_turn)
                 if not chain_capture:
-                    if clicked in pieces and pieces[clicked][0] == current_turn:
-                        moves = get_valid_moves(clicked)
-                        if forced:
-                            moves = [m for m in moves if get_captured_piece(clicked, m)]
+                    if clicked in pieces and pieces[clicked][0]==current_turn:
+                        moves=get_valid_moves(clicked)
+                        if forced: moves=[m for m in moves if get_captured_piece(clicked,m)]
                         if moves:
-                            selected_piece = clicked
-                            valid_moves = moves
+                            selected_piece=clicked
+                            valid_moves=moves
                 if selected_piece and clicked in valid_moves:
-                    history.append((copy.deepcopy(pieces), current_turn, move_count, chain_capture, red_score, blue_score))
-                    captured = apply_move(selected_piece, clicked)
-                    selected_piece = clicked
-                    new_moves = get_valid_moves(clicked)
-                    capture_moves = [m for m in new_moves if get_captured_piece(clicked, m)]
-                    if captured and capture_moves:
-                        valid_moves = capture_moves
-                        chain_capture = True
+                    history.append((copy.deepcopy(pieces),current_turn,move_count,chain_capture,red_score,blue_score))
+                    c=apply_move(selected_piece,clicked)
+                    selected_piece=clicked
+                    nxt=get_valid_moves(clicked)
+                    caps=[m for m in nxt if get_captured_piece(clicked,m)]
+                    if c and caps:
+                        valid_moves=caps
+                        chain_capture=True
                     else:
                         switch_turn()
-                    winner = check_winner()
+                    winner=check_winner()
 
-    if AI_ENABLED and current_turn == "BLUE" and not winner and not paused:
+    if AI_ENABLED and current_turn=="BLUE" and not winner and not paused and not replay_mode:
         pygame.time.delay(300)
         ai_move()
 
+    if replay_mode and history:
+        replay_index = (replay_index + 1) % len(history)
+        pieces = copy.deepcopy(history[replay_index][0])
+        pygame.time.delay(300)
+
     screen.fill(BACKGROUND)
 
-    for row in range(ROWS):
-        for col in range(COLS):
-            color = GREEN if (row + col) % 2 == 0 else BLACK
-            x = MARGIN + col * SQUARE_SIZE
-            y = MARGIN + row * SQUARE_SIZE
-            pygame.draw.rect(screen, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
+    for r in range(ROWS):
+        for c in range(COLS):
+            x=MARGIN+c*SQUARE_SIZE
+            y=MARGIN+r*SQUARE_SIZE
+            pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, (x,y,SQUARE_SIZE,SQUARE_SIZE))
 
-            if hint_move and (row, col) in hint_move:
-                pygame.draw.rect(screen, (255, 165, 0), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
-            elif last_move and ((row, col) == last_move[0] or (row, col) == last_move[1]):
-                pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
-            elif selected_piece == (row, col):
-                pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
-            elif (row, col) in valid_moves:
-                pygame.draw.rect(screen, (0, 0, 255), (x, y, SQUARE_SIZE, SQUARE_SIZE), 4)
+            if hint_move and (r,c) in hint_move:
+                pygame.draw.rect(screen, ORANGE, (x,y,SQUARE_SIZE,SQUARE_SIZE),4)
+            elif last_move and ((r,c)==last_move[0] or (r,c)==last_move[1]):
+                pygame.draw.rect(screen, HIGHLIGHT, (x,y,SQUARE_SIZE,SQUARE_SIZE),4)
+            elif selected_piece==(r,c):
+                pygame.draw.rect(screen, HIGHLIGHT, (x,y,SQUARE_SIZE,SQUARE_SIZE),4)
+            elif (r,c) in valid_moves:
+                pygame.draw.rect(screen, BLUE, (x,y,SQUARE_SIZE,SQUARE_SIZE),4)
 
-            if (row, col) in pieces:
-                center = (x + SQUARE_SIZE // 2, y + SQUARE_SIZE // 2)
-                owner, king = pieces[(row, col)]
-                color = RED if owner == "RED" else BLUE
-                pygame.draw.circle(screen, color, center, SQUARE_SIZE // 3)
-                if king:
-                    pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE // 6)
+            if (r,c) in pieces:
+                center=(x+SQUARE_SIZE//2,y+SQUARE_SIZE//2)
+                o,k=pieces[(r,c)]
+                pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
+                if k: pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE//6)
 
-    remaining_time = max(0, TURN_LIMIT - int(time.time() - turn_start_time))
-
-    screen.blit(font.render(f"Time: {remaining_time}", True, WHITE), (20, 40))
-    screen.blit(font.render(f"Turn: {current_turn}", True, WHITE), (20, 5))
-    screen.blit(font.render(f"Moves: {move_count}", True, WHITE), (200, 5))
-    screen.blit(font.render(f"RED: {red_score}  BLUE: {blue_score}", True, WHITE), (400, 5))
-    screen.blit(font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE), (650, 5))
+    screen.blit(font.render(f"Turn: {current_turn}", True, WHITE), (20,5))
+    screen.blit(font.render(f"Moves: {move_count}", True, WHITE), (200,5))
+    screen.blit(font.render(f"{red_score}:{blue_score}", True, WHITE), (400,5))
+    screen.blit(font.render(f"AI: {'ON' if AI_ENABLED else 'OFF'}", True, WHITE), (650,5))
 
     if paused:
-        text = big_font.render("PAUSED", True, WHITE)
-        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
-
+        screen.blit(big_font.render("PAUSED", True, WHITE), (300,350))
+    if replay_mode:
+        screen.blit(big_font.render("REPLAY", True, WHITE), (300,300))
     if winner:
-        text = big_font.render(f"{winner} WINS! Press R", True, WHITE)
-        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, 10))
+        screen.blit(big_font.render(f"{winner} WINS", True, WHITE), (250,10))
 
     pygame.display.flip()
     clock.tick(60)
