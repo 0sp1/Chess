@@ -44,19 +44,31 @@ def reset_game():
 
 pieces = reset_game()
 
+# 🔥 UPDATED: KING MOVEMENT INCLUDED
 def get_valid_moves(pos):
-    row,col = pos
-    owner,_ = pieces[pos]
-    moves,captures = [],[]
-    for dr,dc in [(-1,0),(1,0),(0,-1),(0,1)]:
-        r,c = row+dr,col+dc
-        if 0<=r<ROWS and 0<=c<COLS and (r,c) not in pieces:
+    row, col = pos
+    owner, is_king = pieces[pos]
+    moves, captures = [], []
+
+    directions = [(-1,0),(1,0),(0,-1),(0,1)]
+
+    # add diagonals if king
+    if is_king:
+        directions += [(-1,-1),(-1,1),(1,-1),(1,1)]
+
+    for dr, dc in directions:
+        r, c = row + dr, col + dc
+
+        if 0 <= r < ROWS and 0 <= c < COLS and (r,c) not in pieces:
             moves.append((r,c))
-        jr,jc = row+2*dr,col+2*dc
-        mid = (row+dr,col+dc)
-        if 0<=jr<ROWS and 0<=jc<COLS:
-            if mid in pieces and pieces[mid][0]!=owner and (jr,jc) not in pieces:
+
+        jr, jc = row + 2*dr, col + 2*dc
+        mid = (row + dr, col + dc)
+
+        if 0 <= jr < ROWS and 0 <= jc < COLS:
+            if mid in pieces and pieces[mid][0] != owner and (jr,jc) not in pieces:
                 captures.append((jr,jc))
+
     return captures if captures else moves
 
 def get_all_captures(player):
@@ -242,7 +254,11 @@ while running:
                 center=(x+SQUARE_SIZE//2,y+SQUARE_SIZE//2)
                 o,k=pieces[(r,c)]
                 pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
-                if k: pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE//6)
+                
+                # 🔥 improved king look
+                if k:
+                    pygame.draw.circle(screen, WHITE, center, SQUARE_SIZE//6)
+                    pygame.draw.circle(screen, ORANGE, center, SQUARE_SIZE//3, 3)
 
     screen.blit(font.render(f"Turn: {current_turn}", True, WHITE), (20,5))
     screen.blit(font.render(f"Moves: {move_count}", True, WHITE), (200,5))
