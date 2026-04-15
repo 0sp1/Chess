@@ -44,6 +44,7 @@ def reset_game():
     return {(0,0):("RED",False),(1,1):("RED",False),(6,6):( "BLUE",False),(7,7):( "BLUE",False)}
 
 pieces = reset_game()
+history = [copy.deepcopy(pieces)]  # ⭐ initialize history
 
 # ---------- CORE LOGIC ----------
 
@@ -85,18 +86,25 @@ def promote(pos):
 
 
 def apply_move(s,e):
-    global red_score,blue_score,last_move,hint_move
+    global red_score,blue_score,last_move,hint_move,history
+
     c = get_captured_piece(s,e)
     if c:
         if pieces[c][0]=="RED": blue_score+=1
         else: red_score+=1
         pieces.pop(c)
+
     o,k = pieces[s]
     pieces[e]=(o,k)
     pieces.pop(s)
     promote(e)
+
     last_move=(s,e)
     hint_move=None
+
+    # ⭐ SAVE STATE
+    history.append(copy.deepcopy(pieces))
+
     return c
 
 
@@ -117,7 +125,7 @@ def check_winner():
     if not r: return "BLUE"
     if not b: return "RED"
 
-# ---------- AI ----------
+# ---------- AI (unchanged) ----------
 
 def evaluate_board(temp_pieces):
     score = 0
@@ -208,32 +216,6 @@ def get_hint(player):
 
     return best_move
 
-
-def save_game():
-    data = {
-        "pieces": pieces,
-        "turn": current_turn,
-        "move_count": move_count,
-        "red_score": red_score,
-        "blue_score": blue_score
-    }
-    with open("save.pkl", "wb") as f:
-        pickle.dump(data, f)
-
-
-def load_game():
-    global pieces, current_turn, move_count, red_score, blue_score
-    try:
-        with open("save.pkl", "rb") as f:
-            data = pickle.load(f)
-        pieces = data["pieces"]
-        current_turn = data["turn"]
-        move_count = data["move_count"]
-        red_score = data["red_score"]
-        blue_score = data["blue_score"]
-    except:
-        print("No save file found!")
-
 # ---------- GAME LOOP ----------
 
 running=True
@@ -244,14 +226,19 @@ while running:
             running=False
 
         if event.type==pygame.KEYDOWN:
-            if event.key==pygame.K_h:
+            if event.key==pygame.K_h and not replay_mode:
                 hint_move = get_hint(current_turn)
-            if event.key==pygame.K_s:
-                save_game()
-            if event.key==pygame.K_l:
-                load_game()
 
-        if event.type==pygame.MOUSEBUTTONDOWN:
+            if event.key==pygame.K_r:
+                replay_mode = not replay_mode
+
+            if replay_mode:
+                if event.key==pygame.K_RIGHT:
+                    replay_index = min(len(history)-1, replay_index+1)
+                if event.key==pygame.K_LEFT:
+                    replay_index = max(0, replay_index-1)
+
+        if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode:
             mx,my=pygame.mouse.get_pos()
             col=(mx-MARGIN)//SQUARE_SIZE
             row=(my-MARGIN)//SQUARE_SIZE
@@ -267,24 +254,32 @@ while running:
 
     screen.fill(BACKGROUND)
 
+    # ⭐ choose board depending on mode
+    draw_pieces = history[replay_index] if replay_mode else pieces
+
     for r in range(ROWS):
         for c in range(COLS):
             x=MARGIN+c*SQUARE_SIZE
             y=MARGIN+r*SQUARE_SIZE
             pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, (x,y,SQUARE_SIZE,SQUARE_SIZE))
 
-            if (r,c) in pieces:
+            if (r,c) in draw_pieces:
                 center=(x+SQUARE_SIZE//2,y+SQUARE_SIZE//2)
-                o,k=pieces[(r,c)]
+                o,k=draw_pieces[(r,c)]
                 pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
 
-    if hint_move:
+    if hint_move and not replay_mode:
         (sr, sc), (er, ec) = hint_move
         sx = MARGIN + sc * SQUARE_SIZE + SQUARE_SIZE // 2
         sy = MARGIN + sr * SQUARE_SIZE + SQUARE_SIZE // 2
         ex = MARGIN + ec * SQUARE_SIZE + SQUARE_SIZE // 2
         ey = MARGIN + er * SQUARE_SIZE + SQUARE_SIZE // 2
         pygame.draw.line(screen, ORANGE, (sx, sy), (ex, ey), 4)
+
+    # ⭐ replay UI
+    if replay_mode:
+        text = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
+        screen.blit(text, (10,10))
 
     pygame.display.flip()
     clock.tick(60)
