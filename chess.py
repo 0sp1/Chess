@@ -27,6 +27,7 @@ winner = None
 chain_capture = False
 move_count = 0
 history = []
+history_index = 0
 AI_ENABLED = True
 SMART_AI = True
 last_move = None
@@ -44,9 +45,8 @@ def reset_game():
     return {(0,0):("RED",False),(1,1):("RED",False),(6,6):( "BLUE",False),(7,7):( "BLUE",False)}
 
 pieces = reset_game()
-history = [copy.deepcopy(pieces)]  # ⭐ initialize history
-
-# ---------- CORE LOGIC ----------
+history = [copy.deepcopy(pieces)]
+history_index = 0
 
 def get_valid_moves(pos):
     row, col = pos
@@ -86,7 +86,7 @@ def promote(pos):
 
 
 def apply_move(s,e):
-    global red_score,blue_score,last_move,hint_move,history
+    global red_score,blue_score,last_move,hint_move,history,history_index
 
     c = get_captured_piece(s,e)
     if c:
@@ -102,8 +102,9 @@ def apply_move(s,e):
     last_move=(s,e)
     hint_move=None
 
-    # ⭐ SAVE STATE
+    history = history[:history_index+1]
     history.append(copy.deepcopy(pieces))
+    history_index += 1
 
     return c
 
@@ -125,7 +126,6 @@ def check_winner():
     if not r: return "BLUE"
     if not b: return "RED"
 
-# ---------- AI (unchanged) ----------
 
 def evaluate_board(temp_pieces):
     score = 0
@@ -216,8 +216,6 @@ def get_hint(player):
 
     return best_move
 
-# ---------- GAME LOOP ----------
-
 running=True
 
 while running:
@@ -231,6 +229,20 @@ while running:
 
             if event.key==pygame.K_r:
                 replay_mode = not replay_mode
+
+            if event.key==pygame.K_u and not replay_mode:
+                if history_index > 0:
+                    history_index -= 1
+                    pieces.clear()
+                    pieces.update(copy.deepcopy(history[history_index]))
+                    switch_turn()
+
+            if event.key==pygame.K_y and not replay_mode:
+                if history_index < len(history) - 1:
+                    history_index += 1
+                    pieces.clear()
+                    pieces.update(copy.deepcopy(history[history_index]))
+                    switch_turn()
 
             if replay_mode:
                 if event.key==pygame.K_RIGHT:
@@ -254,7 +266,6 @@ while running:
 
     screen.fill(BACKGROUND)
 
-    # ⭐ choose board depending on mode
     draw_pieces = history[replay_index] if replay_mode else pieces
 
     for r in range(ROWS):
@@ -276,7 +287,6 @@ while running:
         ey = MARGIN + er * SQUARE_SIZE + SQUARE_SIZE // 2
         pygame.draw.line(screen, ORANGE, (sx, sy), (ex, ey), 4)
 
-    # ⭐ replay UI
     if replay_mode:
         text = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
         screen.blit(text, (10,10))
