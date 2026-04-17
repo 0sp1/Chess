@@ -48,6 +48,32 @@ pieces = reset_game()
 history = [copy.deepcopy(pieces)]
 history_index = 0
 
+def save_game():
+    data = {
+        "pieces": pieces,
+        "history": history,
+        "history_index": history_index,
+        "current_turn": current_turn,
+        "red_score": red_score,
+        "blue_score": blue_score
+    }
+    with open("savegame.pkl", "wb") as f:
+        pickle.dump(data, f)
+
+def load_game():
+    global pieces, history, history_index, current_turn, red_score, blue_score
+    try:
+        with open("savegame.pkl", "rb") as f:
+            data = pickle.load(f)
+            pieces = data["pieces"]
+            history = data["history"]
+            history_index = data["history_index"]
+            current_turn = data["current_turn"]
+            red_score = data["red_score"]
+            blue_score = data["blue_score"]
+    except:
+        pass
+
 def get_valid_moves(pos):
     row, col = pos
     owner, is_king = pieces[pos]
@@ -229,6 +255,12 @@ while running:
 
             if event.key==pygame.K_r:
                 replay_mode = not replay_mode
+
+            if event.key==pygame.K_s:
+                save_game()
+
+            if event.key==pygame.K_l:
+                load_game()
 
             if event.key==pygame.K_u and not replay_mode:
                 if history_index > 0:
