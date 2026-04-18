@@ -74,7 +74,16 @@ def load_game():
     except:
         pass
 
-def get_valid_moves(pos):
+def player_has_capture(player):
+    for pos, (o, _) in pieces.items():
+        if o == player:
+            moves = get_valid_moves_basic(pos)
+            for m in moves:
+                if get_captured_piece(pos, m):
+                    return True
+    return False
+
+def get_valid_moves_basic(pos):
     row, col = pos
     owner, is_king = pieces[pos]
     moves, captures = [], []
@@ -96,20 +105,26 @@ def get_valid_moves(pos):
             if mid in pieces and pieces[mid][0] != owner and (jr,jc) not in pieces:
                 captures.append((jr,jc))
 
-    return captures if captures else moves
+    return moves, captures
 
+def get_valid_moves(pos):
+    moves, captures = get_valid_moves_basic(pos)
+    owner = pieces[pos][0]
+
+    if player_has_capture(owner):
+        return captures
+
+    return captures if captures else moves
 
 def get_captured_piece(s,e):
     if abs(s[0]-e[0])==2 or abs(s[1]-e[1])==2:
         return ((s[0]+e[0])//2,(s[1]+e[1])//2)
-
 
 def promote(pos):
     r,_ = pos
     o,k = pieces[pos]
     if (o=="RED" and r==ROWS-1) or (o=="BLUE" and r==0):
         pieces[pos]=(o,True)
-
 
 def apply_move(s,e):
     global red_score,blue_score,last_move,hint_move,history,history_index
@@ -134,7 +149,6 @@ def apply_move(s,e):
 
     return c
 
-
 def switch_turn():
     global current_turn,selected_piece,valid_moves,chain_capture,move_count,turn_start_time,hint_move
     current_turn="BLUE" if current_turn=="RED" else "RED"
@@ -145,13 +159,11 @@ def switch_turn():
     turn_start_time=time.time()
     hint_move=None
 
-
 def check_winner():
     r = any(o=="RED" for o,_ in pieces.values())
     b = any(o=="BLUE" for o,_ in pieces.values())
     if not r: return "BLUE"
     if not b: return "RED"
-
 
 def evaluate_board(temp_pieces):
     score = 0
@@ -162,7 +174,6 @@ def evaluate_board(temp_pieces):
         else:
             score -= val
     return score
-
 
 def simulate_move(temp_pieces, s, e):
     temp = copy.deepcopy(temp_pieces)
@@ -181,7 +192,6 @@ def simulate_move(temp_pieces, s, e):
 
     return temp
 
-
 def get_moves_for_board(temp_pieces, player):
     moves = []
     for p,(o,_) in temp_pieces.items():
@@ -194,7 +204,6 @@ def get_moves_for_board(temp_pieces, player):
             for move in m:
                 moves.append((p, move))
     return moves
-
 
 def minimax(temp_pieces, depth, maximizing):
     if depth == 0:
@@ -218,7 +227,6 @@ def minimax(temp_pieces, depth, maximizing):
             new_board = simulate_move(temp_pieces, s, e)
             best = min(best, minimax(new_board, depth-1, True))
         return best
-
 
 def get_hint(player):
     best_score = -9999 if player == "BLUE" else 9999
@@ -292,7 +300,16 @@ while running:
                     selected_piece=clicked
                     valid_moves=get_valid_moves(clicked)
                 elif selected_piece and clicked in valid_moves:
-                    apply_move(selected_piece,clicked)
+                    captured = apply_move(selected_piece,clicked)
+
+                    if captured:
+                        selected_piece = clicked
+                        next_moves = get_valid_moves(clicked)
+                        chain_moves = [m for m in next_moves if get_captured_piece(clicked, m)]
+                        if chain_moves:
+                            valid_moves = chain_moves
+                            continue
+
                     switch_turn()
                     winner=check_winner()
 
