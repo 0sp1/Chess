@@ -18,7 +18,6 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 36)
-big_font = pygame.font.SysFont(None, 48)
 
 selected_piece = None
 valid_moves = []
@@ -78,9 +77,8 @@ def player_has_capture(player):
     for pos, (o, _) in pieces.items():
         if o == player:
             moves = get_valid_moves_basic(pos)
-            for m in moves:
-                if get_captured_piece(pos, m):
-                    return True
+            for m in moves[1]:
+                return True
     return False
 
 def get_valid_moves_basic(pos):
@@ -264,32 +262,6 @@ while running:
             if event.key==pygame.K_r:
                 replay_mode = not replay_mode
 
-            if event.key==pygame.K_s:
-                save_game()
-
-            if event.key==pygame.K_l:
-                load_game()
-
-            if event.key==pygame.K_u and not replay_mode:
-                if history_index > 0:
-                    history_index -= 1
-                    pieces.clear()
-                    pieces.update(copy.deepcopy(history[history_index]))
-                    switch_turn()
-
-            if event.key==pygame.K_y and not replay_mode:
-                if history_index < len(history) - 1:
-                    history_index += 1
-                    pieces.clear()
-                    pieces.update(copy.deepcopy(history[history_index]))
-                    switch_turn()
-
-            if replay_mode:
-                if event.key==pygame.K_RIGHT:
-                    replay_index = min(len(history)-1, replay_index+1)
-                if event.key==pygame.K_LEFT:
-                    replay_index = max(0, replay_index-1)
-
         if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode:
             mx,my=pygame.mouse.get_pos()
             col=(mx-MARGIN)//SQUARE_SIZE
@@ -313,9 +285,31 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
-    screen.fill(BACKGROUND)
+    # ⏱️ TIMER FEATURE
+    if not replay_mode and not winner:
+        elapsed = time.time() - turn_start_time
+        remaining = max(0, TURN_LIMIT - elapsed)
 
-    draw_pieces = history[replay_index] if replay_mode else pieces
+        if remaining <= 0:
+            auto_move = get_hint(current_turn)
+
+            if auto_move:
+                s, e = auto_move
+                captured = apply_move(s, e)
+
+                while captured:
+                    next_moves = get_valid_moves(e)
+                    chain_moves = [m for m in next_moves if get_captured_piece(e, m)]
+                    if not chain_moves:
+                        break
+                    e2 = chain_moves[0]
+                    captured = apply_move(e, e2)
+                    e = e2
+
+            switch_turn()
+            winner = check_winner()
+
+    screen.fill(BACKGROUND)
 
     for r in range(ROWS):
         for c in range(COLS):
@@ -323,22 +317,16 @@ while running:
             y=MARGIN+r*SQUARE_SIZE
             pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, (x,y,SQUARE_SIZE,SQUARE_SIZE))
 
-            if (r,c) in draw_pieces:
+            if (r,c) in pieces:
                 center=(x+SQUARE_SIZE//2,y+SQUARE_SIZE//2)
-                o,k=draw_pieces[(r,c)]
+                o,k=pieces[(r,c)]
                 pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
 
-    if hint_move and not replay_mode:
-        (sr, sc), (er, ec) = hint_move
-        sx = MARGIN + sc * SQUARE_SIZE + SQUARE_SIZE // 2
-        sy = MARGIN + sr * SQUARE_SIZE + SQUARE_SIZE // 2
-        ex = MARGIN + ec * SQUARE_SIZE + SQUARE_SIZE // 2
-        ey = MARGIN + er * SQUARE_SIZE + SQUARE_SIZE // 2
-        pygame.draw.line(screen, ORANGE, (sx, sy), (ex, ey), 4)
-
-    if replay_mode:
-        text = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
-        screen.blit(text, (10,10))
+    # 🕒 TIMER DISPLAY
+    elapsed = time.time() - turn_start_time
+    remaining = max(0, int(TURN_LIMIT - elapsed))
+    timer_text = font.render(f"Time: {remaining}s", True, WHITE)
+    screen.blit(timer_text, (650, 10))
 
     pygame.display.flip()
     clock.tick(60)
