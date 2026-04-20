@@ -73,6 +73,24 @@ def load_game():
     except:
         pass
 
+def undo_move():
+    global history_index, pieces, current_turn, turn_start_time, hint_move
+    if history_index > 0:
+        history_index -= 1
+        pieces = copy.deepcopy(history[history_index])
+        switch_turn()
+        turn_start_time = time.time()
+        hint_move = None
+
+def redo_move():
+    global history_index, pieces, current_turn, turn_start_time, hint_move
+    if history_index < len(history) - 1:
+        history_index += 1
+        pieces = copy.deepcopy(history[history_index])
+        switch_turn()
+        turn_start_time = time.time()
+        hint_move = None
+
 def player_has_capture(player):
     for pos, (o, _) in pieces.items():
         if o == player:
@@ -262,6 +280,12 @@ while running:
             if event.key==pygame.K_r:
                 replay_mode = not replay_mode
 
+            if event.key == pygame.K_z:
+                undo_move()
+
+            if event.key == pygame.K_y:
+                redo_move()
+
         if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode:
             mx,my=pygame.mouse.get_pos()
             col=(mx-MARGIN)//SQUARE_SIZE
@@ -285,7 +309,6 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
-    # ⏱️ TIMER FEATURE
     if not replay_mode and not winner:
         elapsed = time.time() - turn_start_time
         remaining = max(0, TURN_LIMIT - elapsed)
@@ -322,7 +345,6 @@ while running:
                 o,k=pieces[(r,c)]
                 pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
 
-    # 🕒 TIMER DISPLAY
     elapsed = time.time() - turn_start_time
     remaining = max(0, int(TURN_LIMIT - elapsed))
     timer_text = font.render(f"Time: {remaining}s", True, WHITE)
