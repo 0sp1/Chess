@@ -126,10 +126,8 @@ def get_valid_moves_basic(pos):
 def get_valid_moves(pos):
     moves, captures = get_valid_moves_basic(pos)
     owner = pieces[pos][0]
-
     if player_has_capture(owner):
         return captures
-
     return captures if captures else moves
 
 def get_captured_piece(s,e):
@@ -274,19 +272,36 @@ while running:
             running=False
 
         if event.type==pygame.KEYDOWN:
-            if event.key==pygame.K_h and not replay_mode:
+            if event.key==pygame.K_ESCAPE:
+                paused = not paused
+
+            if paused:
+                if event.key == pygame.K_s:
+                    save_game()
+                if event.key == pygame.K_l:
+                    load_game()
+                if event.key == pygame.K_r:
+                    global pieces, history, history_index, current_turn, red_score, blue_score
+                    pieces = reset_game()
+                    history = [copy.deepcopy(pieces)]
+                    history_index = 0
+                    current_turn = "RED"
+                    red_score = 0
+                    blue_score = 0
+
+            if event.key==pygame.K_h and not replay_mode and not paused:
                 hint_move = get_hint(current_turn)
 
-            if event.key==pygame.K_r:
+            if event.key==pygame.K_r and not paused:
                 replay_mode = not replay_mode
 
-            if event.key == pygame.K_z:
+            if event.key == pygame.K_z and not paused:
                 undo_move()
 
-            if event.key == pygame.K_y:
+            if event.key == pygame.K_y and not paused:
                 redo_move()
 
-        if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode:
+        if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode and not paused:
             mx,my=pygame.mouse.get_pos()
             col=(mx-MARGIN)//SQUARE_SIZE
             row=(my-MARGIN)//SQUARE_SIZE
@@ -309,7 +324,7 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
-    if not replay_mode and not winner:
+    if not replay_mode and not winner and not paused:
         elapsed = time.time() - turn_start_time
         remaining = max(0, TURN_LIMIT - elapsed)
 
@@ -349,6 +364,26 @@ while running:
     remaining = max(0, int(TURN_LIMIT - elapsed))
     timer_text = font.render(f"Time: {remaining}s", True, WHITE)
     screen.blit(timer_text, (650, 10))
+
+    if paused:
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        pause_text = font.render("PAUSED", True, WHITE)
+        screen.blit(pause_text, (WIDTH//2 - 60, HEIGHT//2 - 100))
+
+        instructions = [
+            "ESC - Resume",
+            "S - Save Game",
+            "L - Load Game",
+            "R - Restart"
+        ]
+
+        for i, line in enumerate(instructions):
+            txt = font.render(line, True, WHITE)
+            screen.blit(txt, (WIDTH//2 - 100, HEIGHT//2 - 20 + i*40))
 
     pygame.display.flip()
     clock.tick(60)
