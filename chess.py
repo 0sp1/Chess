@@ -389,3 +389,41 @@ while running:
     clock.tick(60)
 
 pygame.quit()
+
+liczby = (289, 34)
+liczba1 = liczby[0]
+liczba2 = liczby[1]
+
+while liczba1 != 0 and liczba2 != 0 :
+    
+    if liczba1 > liczba2:
+        liczba1 = liczba1%liczba2
+    else:
+        liczba2 = liczba2%liczba1
+
+print(liczba1, liczba2)
+
+liczby = [x for x in range(1,101)]
+liczba_pierwsza = []
+for liczba in liczby:
+    if liczba <2:
+        continue
+    print(liczba)
+    for dzielnik in range(2, liczba):
+        if liczba%dzielnik == 0:
+            break
+    else:
+        liczba_pierwsza.append(liczba)
+    
+print(liczba_pierwsza)
+
+n1 = 1
+n2 = 1
+
+
+for _ in range(10):
+    holder = n1 + n2 
+    n1 = n2
+    n2 =holder
+
+print(n2)
