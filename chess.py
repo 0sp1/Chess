@@ -281,7 +281,6 @@ while running:
                 if event.key == pygame.K_l:
                     load_game()
                 if event.key == pygame.K_r:
-                    global pieces, history, history_index, current_turn, red_score, blue_score
                     pieces = reset_game()
                     history = [copy.deepcopy(pieces)]
                     history_index = 0
@@ -351,14 +350,38 @@ while running:
 
     for r in range(ROWS):
         for c in range(COLS):
-            x=MARGIN+c*SQUARE_SIZE
-            y=MARGIN+r*SQUARE_SIZE
-            pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, (x,y,SQUARE_SIZE,SQUARE_SIZE))
+            x = MARGIN + c * SQUARE_SIZE
+            y = MARGIN + r * SQUARE_SIZE
+            rect = (x, y, SQUARE_SIZE, SQUARE_SIZE)
 
-            if (r,c) in pieces:
-                center=(x+SQUARE_SIZE//2,y+SQUARE_SIZE//2)
-                o,k=pieces[(r,c)]
-                pygame.draw.circle(screen, RED if o=="RED" else BLUE, center, SQUARE_SIZE//3)
+            pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, rect)
+
+            if selected_piece == (r, c):
+                pygame.draw.rect(screen, HIGHLIGHT, rect, 4)
+
+            if (r, c) in valid_moves:
+                pygame.draw.circle(screen, ORANGE,
+                                   (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), 10)
+
+            if last_move:
+                start, end = last_move
+                if (r, c) == start or (r, c) == end:
+                    pygame.draw.rect(screen, (0,255,255), rect, 3)
+
+            if hint_move:
+                _, hint_end = hint_move
+                if (r, c) == hint_end:
+                    pygame.draw.circle(screen, (0,255,0),
+                                       (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), 12, 2)
+
+            if (r, c) in pieces:
+                center = (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2)
+                o, k = pieces[(r, c)]
+                color = RED if o == "RED" else BLUE
+                pygame.draw.circle(screen, color, center, SQUARE_SIZE//3)
+
+                if k:
+                    pygame.draw.circle(screen, WHITE, center, 10)
 
     elapsed = time.time() - turn_start_time
     remaining = max(0, int(TURN_LIMIT - elapsed))
@@ -389,5 +412,3 @@ while running:
     clock.tick(60)
 
 pygame.quit()
-
-
