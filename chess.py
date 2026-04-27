@@ -37,8 +37,11 @@ TURN_LIMIT = 10
 hint_move = None
 paused = False
 
+# 🔁 REPLAY SYSTEM
 replay_mode = False
 replay_index = 0
+replay_timer = 0
+REPLAY_DELAY = 500
 
 def reset_game():
     return {(0,0):("RED",False),(1,1):("RED",False),(6,6):( "BLUE",False),(7,7):( "BLUE",False)}
@@ -275,6 +278,18 @@ while running:
             if event.key==pygame.K_ESCAPE:
                 paused = not paused
 
+            # 🔁 REPLAY TOGGLE
+            if event.key == pygame.K_p:
+                replay_mode = not replay_mode
+                replay_index = 0
+                replay_timer = pygame.time.get_ticks()
+
+            if replay_mode:
+                if event.key == pygame.K_RIGHT:
+                    replay_index = min(len(history)-1, replay_index+1)
+                if event.key == pygame.K_LEFT:
+                    replay_index = max(0, replay_index-1)
+
             if paused:
                 if event.key == pygame.K_s:
                     save_game()
@@ -291,13 +306,10 @@ while running:
             if event.key==pygame.K_h and not replay_mode and not paused:
                 hint_move = get_hint(current_turn)
 
-            if event.key==pygame.K_r and not paused:
-                replay_mode = not replay_mode
-
-            if event.key == pygame.K_z and not paused:
+            if event.key == pygame.K_z and not paused and not replay_mode:
                 undo_move()
 
-            if event.key == pygame.K_y and not paused:
+            if event.key == pygame.K_y and not paused and not replay_mode:
                 redo_move()
 
         if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode and not paused:
@@ -323,30 +335,17 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
-    if not replay_mode and not winner and not paused:
-        elapsed = time.time() - turn_start_time
-        remaining = max(0, TURN_LIMIT - elapsed)
-
-        if remaining <= 0:
-            auto_move = get_hint(current_turn)
-
-            if auto_move:
-                s, e = auto_move
-                captured = apply_move(s, e)
-
-                while captured:
-                    next_moves = get_valid_moves(e)
-                    chain_moves = [m for m in next_moves if get_captured_piece(e, m)]
-                    if not chain_moves:
-                        break
-                    e2 = chain_moves[0]
-                    captured = apply_move(e, e2)
-                    e = e2
-
-            switch_turn()
-            winner = check_winner()
+    # 🔁 AUTO REPLAY
+    if replay_mode:
+        now = pygame.time.get_ticks()
+        if now - replay_timer > REPLAY_DELAY:
+            replay_timer = now
+            if replay_index < len(history) - 1:
+                replay_index += 1
 
     screen.fill(BACKGROUND)
+
+    display_pieces = history[replay_index] if replay_mode else pieces
 
     for r in range(ROWS):
         for c in range(COLS):
@@ -356,57 +355,19 @@ while running:
 
             pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, rect)
 
-            if selected_piece == (r, c):
-                pygame.draw.rect(screen, HIGHLIGHT, rect, 4)
-
-            if (r, c) in valid_moves:
-                pygame.draw.circle(screen, ORANGE,
-                                   (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), 10)
-
-            if last_move:
-                start, end = last_move
-                if (r, c) == start or (r, c) == end:
-                    pygame.draw.rect(screen, (0,255,255), rect, 3)
-
-            if hint_move:
-                _, hint_end = hint_move
-                if (r, c) == hint_end:
-                    pygame.draw.circle(screen, (0,255,0),
-                                       (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), 12, 2)
-
-            if (r, c) in pieces:
+            if (r, c) in display_pieces:
                 center = (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2)
-                o, k = pieces[(r, c)]
+                o, k = display_pieces[(r, c)]
                 color = RED if o == "RED" else BLUE
                 pygame.draw.circle(screen, color, center, SQUARE_SIZE//3)
 
                 if k:
                     pygame.draw.circle(screen, WHITE, center, 10)
 
-    elapsed = time.time() - turn_start_time
-    remaining = max(0, int(TURN_LIMIT - elapsed))
-    timer_text = font.render(f"Time: {remaining}s", True, WHITE)
-    screen.blit(timer_text, (650, 10))
-
-    if paused:
-        overlay = pygame.Surface((WIDTH, HEIGHT))
-        overlay.set_alpha(180)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (0, 0))
-
-        pause_text = font.render("PAUSED", True, WHITE)
-        screen.blit(pause_text, (WIDTH//2 - 60, HEIGHT//2 - 100))
-
-        instructions = [
-            "ESC - Resume",
-            "S - Save Game",
-            "L - Load Game",
-            "R - Restart"
-        ]
-
-        for i, line in enumerate(instructions):
-            txt = font.render(line, True, WHITE)
-            screen.blit(txt, (WIDTH//2 - 100, HEIGHT//2 - 20 + i*40))
+    # UI
+    if replay_mode:
+        txt = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
+        screen.blit(txt, (10, 10))
 
     pygame.display.flip()
     clock.tick(60)
