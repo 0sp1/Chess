@@ -37,14 +37,13 @@ TURN_LIMIT = 10
 hint_move = None
 paused = False
 
-# 🔁 REPLAY SYSTEM
 replay_mode = False
 replay_index = 0
 replay_timer = 0
 REPLAY_DELAY = 500
 
 def reset_game():
-    return {(0,0):("RED",False),(1,1):("RED",False),(6,6):( "BLUE",False),(7,7):( "BLUE",False)}
+    return {(0,0):("RED",False),(1,1):("RED",False),(6,6):("BLUE",False),(7,7):("BLUE",False)}
 
 pieces = reset_game()
 history = [copy.deepcopy(pieces)]
@@ -267,6 +266,15 @@ def get_hint(player):
 
     return best_move
 
+def get_random_move(player):
+    all_moves = []
+    for pos, (o, _) in pieces.items():
+        if o == player:
+            moves = get_valid_moves(pos)
+            for m in moves:
+                all_moves.append((pos, m))
+    return random.choice(all_moves) if all_moves else None
+
 running=True
 
 while running:
@@ -278,7 +286,6 @@ while running:
             if event.key==pygame.K_ESCAPE:
                 paused = not paused
 
-            # 🔁 REPLAY TOGGLE
             if event.key == pygame.K_p:
                 replay_mode = not replay_mode
                 replay_index = 0
@@ -335,7 +342,15 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
-    # 🔁 AUTO REPLAY
+    if not paused and not replay_mode and winner is None:
+        elapsed = time.time() - turn_start_time
+        if elapsed > TURN_LIMIT:
+            move = get_random_move(current_turn)
+            if move:
+                s, e = move
+                apply_move(s, e)
+            switch_turn()
+
     if replay_mode:
         now = pygame.time.get_ticks()
         if now - replay_timer > REPLAY_DELAY:
@@ -364,12 +379,16 @@ while running:
                 if k:
                     pygame.draw.circle(screen, WHITE, center, 10)
 
-    # UI
     if replay_mode:
         txt = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
         screen.blit(txt, (10, 10))
+    else:
+        remaining = max(0, int(TURN_LIMIT - (time.time() - turn_start_time)))
+        timer_text = font.render(f"Time: {remaining}", True, ORANGE)
+        screen.blit(timer_text, (650, 10))
 
     pygame.display.flip()
     clock.tick(60)
 
 pygame.quit()
+
