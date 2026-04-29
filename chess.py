@@ -275,6 +275,34 @@ def get_random_move(player):
                 all_moves.append((pos, m))
     return random.choice(all_moves) if all_moves else None
 
+def draw_highlights():
+    if selected_piece:
+        r, c = selected_piece
+        x = MARGIN + c * SQUARE_SIZE
+        y = MARGIN + r * SQUARE_SIZE
+        pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 3)
+
+        for move in valid_moves:
+            mr, mc = move
+            mx = MARGIN + mc * SQUARE_SIZE + SQUARE_SIZE // 2
+            my = MARGIN + mr * SQUARE_SIZE + SQUARE_SIZE // 2
+            pygame.draw.circle(screen, ORANGE, (mx, my), 10)
+
+    if last_move:
+        for pos in last_move:
+            r, c = pos
+            x = MARGIN + c * SQUARE_SIZE
+            y = MARGIN + r * SQUARE_SIZE
+            pygame.draw.rect(screen, WHITE, (x, y, SQUARE_SIZE, SQUARE_SIZE), 3)
+
+    if hint_move:
+        s, e = hint_move
+        for pos in [s, e]:
+            r, c = pos
+            x = MARGIN + c * SQUARE_SIZE
+            y = MARGIN + r * SQUARE_SIZE
+            pygame.draw.rect(screen, BLUE, (x, y, SQUARE_SIZE, SQUARE_SIZE), 3)
+
 running=True
 
 while running:
@@ -342,6 +370,15 @@ while running:
                     switch_turn()
                     winner=check_winner()
 
+    if AI_ENABLED and not paused and not replay_mode and winner is None:
+        if current_turn == "BLUE":
+            pygame.time.delay(300)
+            move = get_hint("BLUE") if SMART_AI else get_random_move("BLUE")
+            if move:
+                s, e = move
+                apply_move(s, e)
+            switch_turn()
+
     if not paused and not replay_mode and winner is None:
         elapsed = time.time() - turn_start_time
         if elapsed > TURN_LIMIT:
@@ -379,16 +416,22 @@ while running:
                 if k:
                     pygame.draw.circle(screen, WHITE, center, 10)
 
+    if not replay_mode:
+        draw_highlights()
+
     if replay_mode:
         txt = font.render(f"REPLAY {replay_index+1}/{len(history)}", True, WHITE)
         screen.blit(txt, (10, 10))
     else:
         remaining = max(0, int(TURN_LIMIT - (time.time() - turn_start_time)))
         timer_text = font.render(f"Time: {remaining}", True, ORANGE)
+        turn_text = font.render(f"Turn: {current_turn}", True, WHITE)
+        score_text = font.render(f"RED {red_score} - {blue_score} BLUE", True, WHITE)
         screen.blit(timer_text, (650, 10))
+        screen.blit(turn_text, (10, 10))
+        screen.blit(score_text, (10, 50))
 
     pygame.display.flip()
     clock.tick(60)
 
 pygame.quit()
-
