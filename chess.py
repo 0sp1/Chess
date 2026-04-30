@@ -42,6 +42,13 @@ replay_index = 0
 replay_timer = 0
 REPLAY_DELAY = 500
 
+animating = False
+anim_piece = None
+anim_start = None
+anim_end = None
+anim_progress = 0
+ANIM_SPEED = 0.2
+
 def reset_game():
     return {(0,0):("RED",False),(1,1):("RED",False),(6,6):("BLUE",False),(7,7):("BLUE",False)}
 
@@ -144,6 +151,13 @@ def promote(pos):
 
 def apply_move(s,e):
     global red_score,blue_score,last_move,hint_move,history,history_index
+    global animating, anim_piece, anim_start, anim_end, anim_progress
+
+    animating = True
+    anim_piece = pieces[s]
+    anim_start = s
+    anim_end = e
+    anim_progress = 0
 
     c = get_captured_piece(s,e)
     if c:
@@ -281,7 +295,6 @@ def draw_highlights():
         x = MARGIN + c * SQUARE_SIZE
         y = MARGIN + r * SQUARE_SIZE
         pygame.draw.rect(screen, HIGHLIGHT, (x, y, SQUARE_SIZE, SQUARE_SIZE), 3)
-
         for move in valid_moves:
             mr, mc = move
             mx = MARGIN + mc * SQUARE_SIZE + SQUARE_SIZE // 2
@@ -347,7 +360,7 @@ while running:
             if event.key == pygame.K_y and not paused and not replay_mode:
                 redo_move()
 
-        if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode and not paused:
+        if event.type==pygame.MOUSEBUTTONDOWN and not replay_mode and not paused and not animating:
             mx,my=pygame.mouse.get_pos()
             col=(mx-MARGIN)//SQUARE_SIZE
             row=(my-MARGIN)//SQUARE_SIZE
@@ -408,6 +421,9 @@ while running:
             pygame.draw.rect(screen, GREEN if (r+c)%2==0 else BLACK, rect)
 
             if (r, c) in display_pieces:
+                if animating and (r, c) == anim_end:
+                    continue
+
                 center = (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2)
                 o, k = display_pieces[(r, c)]
                 color = RED if o == "RED" else BLUE
@@ -415,6 +431,29 @@ while running:
 
                 if k:
                     pygame.draw.circle(screen, WHITE, center, 10)
+
+    if animating:
+        sr, sc = anim_start
+        er, ec = anim_end
+
+        sx = MARGIN + sc * SQUARE_SIZE + SQUARE_SIZE//2
+        sy = MARGIN + sr * SQUARE_SIZE + SQUARE_SIZE//2
+        ex = MARGIN + ec * SQUARE_SIZE + SQUARE_SIZE//2
+        ey = MARGIN + er * SQUARE_SIZE + SQUARE_SIZE//2
+
+        x = sx + (ex - sx) * anim_progress
+        y = sy + (ey - sy) * anim_progress
+
+        color = RED if anim_piece[0] == "RED" else BLUE
+        pygame.draw.circle(screen, color, (int(x), int(y)), SQUARE_SIZE//3)
+
+        if anim_piece[1]:
+            pygame.draw.circle(screen, WHITE, (int(x), int(y)), 10)
+
+        anim_progress += ANIM_SPEED
+
+        if anim_progress >= 1:
+            animating = False
 
     if not replay_mode:
         draw_highlights()
