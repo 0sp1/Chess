@@ -222,6 +222,28 @@ def simulate_move(temp_pieces, s, e):
 
     return temp
 
+def get_capture_moves(pos, board):
+    global pieces
+    old = pieces
+    pieces = board
+    moves = get_valid_moves(pos)
+    pieces = old
+    return [m for m in moves if get_captured_piece(pos, m)]
+
+def simulate_full_move(temp_pieces, s, e):
+    temp = simulate_move(temp_pieces, s, e)
+    current_pos = e
+
+    while True:
+        captures = get_capture_moves(current_pos, temp)
+        if not captures:
+            break
+        next_move = captures[0]
+        temp = simulate_move(temp, current_pos, next_move)
+        current_pos = next_move
+
+    return temp
+
 def get_moves_for_board(temp_pieces, player):
     moves = []
     for p,(o,_) in temp_pieces.items():
@@ -248,13 +270,13 @@ def minimax(temp_pieces, depth, maximizing):
     if maximizing:
         best = -9999
         for s,e in moves:
-            new_board = simulate_move(temp_pieces, s, e)
+            new_board = simulate_full_move(temp_pieces, s, e)
             best = max(best, minimax(new_board, depth-1, False))
         return best
     else:
         best = 9999
         for s,e in moves:
-            new_board = simulate_move(temp_pieces, s, e)
+            new_board = simulate_full_move(temp_pieces, s, e)
             best = min(best, minimax(new_board, depth-1, True))
         return best
 
@@ -266,7 +288,7 @@ def get_hint(player):
         if o == player:
             moves = get_valid_moves(p)
             for move in moves:
-                temp = simulate_move(pieces, p, move)
+                temp = simulate_full_move(pieces, p, move)
                 score = minimax(temp, 2, player == "RED")
 
                 if player == "BLUE":
@@ -390,6 +412,12 @@ while running:
             if move:
                 s, e = move
                 apply_move(s, e)
+                while True:
+                    captures = [m for m in get_valid_moves(e) if get_captured_piece(e, m)]
+                    if not captures:
+                        break
+                    e = captures[0]
+                    apply_move(s, e)
             switch_turn()
 
     if not paused and not replay_mode and winner is None:
